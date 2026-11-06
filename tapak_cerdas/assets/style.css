@@ -1,0 +1,374 @@
+/* =========================================================================
+   TAPAK CERDAS - REPLIKA RESMI DESAIN GEOTEKNIK DARK SLATE (PERSIS PDF)
+   Desain Visual: Dark Slate Geotechnical BIM/CAD Suite dengan Aksen Magenta & Cyan
+   Sesuai Format 4 Halaman Dokumen PDF Referensi
+   ========================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap');
+
+:root {
+    --bg-dark-deep: #070D1E;
+    --bg-dark-card: #111C38;
+    --bg-dark-secondary: #0B132B;
+    --border-card: #1E293B;
+    --border-active: #38BDF8;
+    --text-pure: #F8FAFC;
+    --text-muted: #94A3B8;
+    --magenta-primary: #EC4899;
+    --cyan-accent: #06B6D4;
+    --blue-accent: #3B82F6;
+    --emerald-safe: #10B981;
+    --amber-warn: #F59E0B;
+}
+
+/* Base Body & Reset */
+html, body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    background-color: var(--bg-dark-deep) !important;
+    color: var(--text-pure) !important;
+    margin: 0;
+    padding: 0;
+}
+
+/* =========================================================================
+   1. STREAMLIT CONTAINER & APP BACKGROUND (DARK SLATE BLUEPRINT)
+   ========================================================================= */
+.stApp, 
+[data-testid="stAppViewContainer"], 
+.main, 
+section.main {
+    background-color: #070D1E !important;
+    background-image: 
+        /* Ortho Drafting Grid (25px Minor, 100px Major) Sesuai PDF */
+        linear-gradient(to right, rgba(56, 189, 248, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(56, 189, 248, 0.05) 1px, transparent 1px),
+        linear-gradient(to right, rgba(56, 189, 248, 0.12) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(56, 189, 248, 0.12) 1px, transparent 1px),
+        /* Atmospheric Vignette */
+        radial-gradient(circle at 10% 15%, #0F2347 0%, transparent 55%),
+        radial-gradient(circle at 90% 85%, #0B1833 0%, transparent 60%),
+        #070D1E !important;
+    background-size: 25px 25px, 25px 25px, 100px 100px, 100px 100px, 100% 100%, 100% 100%, 100% 100% !important;
+    background-position: 0 0, 0 0, 0 0, 0 0, center, center, center !important;
+    background-attachment: fixed !important;
+    color: #F8FAFC !important;
+}
+
+[data-testid="stHeader"] {
+    background: transparent !important;
+}
+
+/* =========================================================================
+   2. FIX SIDEBAR (MENCEGAH PUTIH - DIJADIKAN DARK SLATE ELEGAN PERSIS PDF)
+   ========================================================================= */
+[data-testid="stSidebar"],
+[data-testid="stSidebar"] > div,
+[data-testid="stSidebarContent"],
+[data-testid="stSidebarNav"],
+[data-testid="stSidebarNavItems"],
+section[data-testid="stSidebar"],
+section[data-testid="stSidebar"] > div {
+    background-color: #0B132B !important;
+    background-image: 
+        linear-gradient(rgba(56, 189, 248, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(56, 189, 248, 0.04) 1px, transparent 1px) !important;
+    background-size: 20px 20px !important;
+    color: #E2E8F0 !important;
+    border-right: 1px solid #1E293B !important;
+    box-shadow: 4px 0 25px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-testid="stSidebar"] * {
+    color: #E2E8F0 !important;
+}
+
+/* Sidebar Navigation Items */
+[data-testid="stSidebarNav"] a {
+    color: #94A3B8 !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    padding: 8px 14px !important;
+    transition: all 0.2s ease !important;
+}
+
+[data-testid="stSidebarNav"] a:hover {
+    background: rgba(56, 189, 248, 0.15) !important;
+    color: #38BDF8 !important;
+}
+
+[data-testid="stSidebarNav"] a[aria-current="page"] {
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.25) 0%, rgba(59, 130, 246, 0.2) 100%) !important;
+    border-left: 3.5px solid #EC4899 !important;
+    color: #FFFFFF !important;
+    font-weight: 750 !important;
+    box-shadow: 0 4px 12px rgba(236, 72, 153, 0.2) !important;
+}
+
+/* =========================================================================
+   3. TOP NAVBAR PERSIS HALAMAN 1, 2, 3 PDF
+   ========================================================================= */
+.top-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #0B132B !important;
+    border: 1px solid #1E293B !important;
+    border-radius: 12px;
+    padding: 0.85rem 1.6rem;
+    margin-bottom: 1.2rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+}
+
+.brand-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+    font-size: 1.25rem;
+    color: #FFFFFF;
+    letter-spacing: -0.3px;
+}
+
+.brand-badge {
+    background: linear-gradient(135deg, #EC4899 0%, #DB2777 100%);
+    color: #FFFFFF;
+    padding: 2px 10px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    box-shadow: 0 0 10px rgba(236, 72, 153, 0.4);
+}
+
+/* Horizontal Sub-Navbar Tabs (Sesuai PDF) */
+.sub-nav-tabs {
+    display: flex;
+    gap: 8px;
+    background: #0B132B;
+    border: 1px solid #1E293B;
+    border-radius: 10px;
+    padding: 6px 10px;
+    margin-bottom: 1.5rem;
+    overflow-x: auto;
+}
+
+.sub-nav-item {
+    padding: 7px 16px;
+    border-radius: 7px;
+    font-size: 0.85rem;
+    font-weight: 650;
+    color: #94A3B8;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.sub-nav-item:hover {
+    color: #38BDF8;
+    background: rgba(56, 189, 248, 0.1);
+}
+
+.sub-nav-item.active {
+    background: linear-gradient(135deg, #EC4899 0%, #D946EF 100%);
+    color: #FFFFFF !important;
+    font-weight: 750;
+    box-shadow: 0 2px 10px rgba(236, 72, 153, 0.4);
+}
+
+/* =========================================================================
+   4. KARTU FITUR DARK SLATE (PERSIS PDF)
+   ========================================================================= */
+.dark-card {
+    background: #111C38 !important;
+    border: 1px solid #1E293B !important;
+    border-radius: 12px !important;
+    padding: 1.3rem 1.5rem !important;
+    margin-bottom: 1.1rem !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
+    transition: transform 0.2s ease, border-color 0.2s ease !important;
+}
+
+.dark-card:hover {
+    border-color: #38BDF8 !important;
+}
+
+/* Stat Box Rata-Rata Terbobot (Persis Halaman 2 PDF) */
+.stat-box-weighted {
+    background: #0B132B;
+    border: 1.5px solid #3B82F6;
+    border-radius: 12px;
+    padding: 1.2rem;
+    margin: 1rem 0;
+    text-align: center;
+}
+
+/* Kotak Rekomendasi Hijau (Persis Halaman 2 & 3 PDF) */
+.recommendation-box {
+    background: rgba(6, 78, 59, 0.25) !important;
+    border: 1.5px solid #10B981 !important;
+    border-radius: 10px !important;
+    padding: 12px 16px !important;
+    margin: 12px 0 !important;
+    font-size: 0.88rem !important;
+    color: #E2E8F0 !important;
+    line-height: 1.6 !important;
+}
+
+/* =========================================================================
+   5. TOMBOL AKSI UTAMA (MAGENTA / PINK GRADIENT SESUAI PDF)
+   ========================================================================= */
+button[kind="primary"] {
+    background: linear-gradient(135deg, #EC4899 0%, #D946EF 50%, #8B5CF6 100%) !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 750 !important;
+    font-size: 0.95rem !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 4px 15px rgba(236, 72, 153, 0.45) !important;
+    padding: 0.6rem 1.4rem !important;
+    transition: all 0.2s ease !important;
+}
+
+button[kind="primary"]:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 22px rgba(236, 72, 153, 0.65) !important;
+}
+
+button[kind="secondary"] {
+    background: #0B132B !important;
+    border: 1px solid #334155 !important;
+    border-radius: 8px !important;
+    color: #E2E8F0 !important;
+    font-weight: 650 !important;
+    transition: all 0.2s ease !important;
+}
+
+button[kind="secondary"]:hover {
+    border-color: #38BDF8 !important;
+    color: #38BDF8 !important;
+}
+
+/* =========================================================================
+   6. TABEL KOMPARASI & GEOTEKNIK (PERSIS PDF)
+   ========================================================================= */
+.geo-table-dark-container {
+    overflow-x: auto;
+    margin: 1rem 0;
+    border-radius: 10px;
+    border: 1px solid #1E293B;
+    background: #0F172A;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+.geo-table-dark {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    text-align: center;
+}
+
+.geo-table-dark thead tr {
+    background: #111C38;
+    color: #94A3B8;
+    font-weight: 750;
+    text-transform: uppercase;
+    font-size: 0.76rem;
+    letter-spacing: 0.6px;
+    border-bottom: 2px solid #1E293B;
+}
+
+.geo-table-dark th {
+    padding: 12px 10px;
+}
+
+.geo-table-dark tbody tr {
+    border-bottom: 1px solid #1E293B;
+    transition: background 0.2s ease;
+}
+
+.geo-table-dark tbody tr:hover {
+    background-color: #172554 !important;
+}
+
+.geo-table-dark td {
+    padding: 12px 10px;
+    color: #E2E8F0;
+}
+
+/* Status Pill AMAN (OK) Sesuai PDF */
+.pill-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 12px;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 750;
+}
+
+.pill-safe {
+    background: rgba(16, 185, 129, 0.15) !important;
+    color: #34D399 !important;
+    border: 1px solid #059669 !important;
+}
+
+.pill-danger {
+    background: rgba(239, 68, 68, 0.15) !important;
+    color: #F87171 !important;
+    border: 1px solid #DC2626 !important;
+}
+
+/* =========================================================================
+   7. INPUTS & FORM CONTROLS DARK SLATE (PERSIS PDF)
+   ========================================================================= */
+div[data-testid="stNumberInput"] input,
+div[data-testid="stTextInput"] input,
+div[data-testid="stSelectbox"] div[data-baseweb="select"] {
+    background-color: #0B132B !important;
+    color: #FFFFFF !important;
+    border: 1px solid #334155 !important;
+    border-radius: 8px !important;
+}
+
+div[data-testid="stNumberInput"] input:focus,
+div[data-testid="stTextInput"] input:focus {
+    border-color: #EC4899 !important;
+}
+
+/* Metric Tiles */
+.metric-tile-dark {
+    background: #111C38 !important;
+    border: 1px solid #1E293B !important;
+    border-radius: 12px !important;
+    padding: 1.2rem 1.4rem !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25) !important;
+    border-top: 3px solid #38BDF8 !important;
+}
+
+.metric-tile-dark.cyan { border-top-color: #06B6D4 !important; }
+.metric-tile-dark.emerald { border-top-color: #10B981 !important; }
+.metric-tile-dark.amber { border-top-color: #F59E0B !important; }
+.metric-tile-dark.rose { border-top-color: #EC4899 !important; }
+
+.tile-tag-dark {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #94A3B8;
+    margin-bottom: 0.35rem;
+}
+
+.tile-val-dark {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #F8FAFC;
+    line-height: 1.1;
+}
+
+.tile-sub-dark {
+    font-size: 0.8rem;
+    color: #64748B;
+    margin-top: 0.4rem;
+}

@@ -1,0 +1,23 @@
+[
+  {
+    "client_name": "Abrar Tanjung S. T",
+    "client_wa": "085640762669",
+    "notes": "Mohon bantuan review fondasi untuk ruko 3 lantai di tanah pekarangan sedang.",
+    "project_name": "Pembangunan Ruko 3 Lantai Cerdas",
+    "location": "Kawasan Komersial Mandiri",
+    "building_function": "Rumah Tinggal / Hunian Privat (1.92 kN/m²)",
+    "floors": 2,
+    "p_column": 237.44,
+    "width_b": 1.15,
+    "length_l": 1.15,
+    "depth_df": 1.5,
+    "cohesion": 35.0,
+    "friction_angle": 12.0,
+    "unit_weight": 17.5,
+    "water_table": 1.5,
+    "min_sf": 2.8,
+    "status": "PERLU DIPERBESAR",
+    "submitted_at": "2026-11-01 22:21:38",
+    "id": "SUB-0001"
+  }
+]
