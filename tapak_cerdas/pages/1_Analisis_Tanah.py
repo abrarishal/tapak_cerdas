@@ -31,6 +31,7 @@ importlib.reload(utils.excel_exporter)
 from modules.spt_analyzer import (
     compute_spt_layer,
     compute_weighted_average_params,
+    plot_single_unified_spt_chart,
     plot_spt_profile,
     plot_stratigraphy_column,
     SAMPLE_BORELOG_UNDIP_BH4
@@ -224,10 +225,11 @@ with tab_spt:
                     <th>Tebal (m)</th>
                     <th>N-SPT</th>
                     <th>Konsistensi / Kepadatan</th>
-                    <th>Tipe Tanah (Hasil Deteksi)</th>
-                    <th>Deskripsi Lapangan (Bore Log)</th>
-                    <th>Kohesi c (kPa)</th>
+                    <th>Tipe Tanah</th>
+                    <th>Deskripsi Lapangan</th>
+                    <th>Kuat Geser cu (kPa)</th>
                     <th>Sudut Geser φ (°)</th>
+                    <th>Sudut Geser Efektif φ' (°)</th>
                     <th>Berat Isi γ (kN/m³)</th>
                 </tr>
             </thead>
@@ -243,7 +245,9 @@ with tab_spt:
             stype = r.get("soil_type", "Tanah")
             desc = r.get("deskripsi", stype)
             c_val = r.get("c", 0.0)
+            cu_val = r.get("cu", c_val)
             phi_val = r.get("phi", 0.0)
+            phi_eff = r.get("phi_eff", phi_val if phi_val > 0 else 22.0)
             gam_val = r.get("gamma", 17.5)
             
             tbl_html += f"""
@@ -254,8 +258,9 @@ with tab_spt:
                 <td><span class="pill-status pill-safe">{kons}</span></td>
                 <td style="font-weight:600; color:#E2E8F0;">{stype}</td>
                 <td style="font-size:0.85rem; color:#94A3B8;">{desc}</td>
-                <td style="color:#F472B6; font-weight:700;">{c_val} kPa</td>
+                <td style="color:#F472B6; font-weight:700;">{cu_val} kPa</td>
                 <td style="color:#38BDF8; font-weight:700;">{phi_val}°</td>
+                <td style="color:#A78BFA; font-weight:700;">{phi_eff}°</td>
                 <td style="color:#34D399; font-weight:700;">{gam_val}</td>
             </tr>
             """
@@ -298,30 +303,48 @@ with tab_spt:
 
     st.markdown("---")
 
-    # HASIL REKAPITULASI ZONA PONDASI & GRAFIK DUA KOLOM
-    col_res1, col_res2 = st.columns([1.3, 1.2])
+    # HASIL REKAPITULASI ZONA PONDASI & GRAFIK TUNGGAL
+    col_res1, col_res2 = st.columns([1.2, 1.3])
 
     with col_res1:
-        st.markdown("#### 🎯 Rekapitulasi Parameter untuk Fondasi Dangkal (0 - 3.0 m)")
+        st.markdown("#### 🎯 Rekapitulasi Parameter Fondasi Dangkal (0 - 3.0 m)")
         avg_params = compute_weighted_average_params(st.session_state.spt_layers, target_depth=3.0)
         
+        # Pilihan Mode Kondisi Tegangan
+        mode_spt_drain = st.radio(
+            "Pilih Asumsi Analisis Tanah Dasar Fondasi:",
+            [
+                "Analisis Tegangan Total (Undrained: φ = 0° untuk Lempung Jenuh, c = cu)",
+                "Analisis Tegangan Efektif (Drained: Sudut Geser Efektif φ' > 0°, c' ≈ 5-10 kPa)"
+            ],
+            index=0,
+            key="mode_spt_drain"
+        )
+        use_effective = "Efektif" in mode_spt_drain
+
+        final_c = round(avg_params.get("cu", avg_params["c"]), 1) if not use_effective else 10.0
+        final_phi = round(avg_params["phi"], 1) if not use_effective else round(avg_params.get("phi_eff", 24.0), 1)
+
         st.html(f"""
         <div class="dark-card" style="border: 2px solid #3B82F6; background: rgba(15, 23, 42, 0.95);">
             <div style="font-size:0.85rem; font-weight:800; color:#60A5FA; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px;">
-                📐 RATA-RATA TERBOBOT KETEBALAN PADA ZONA TELAPAK (Kedalaman 0 - {avg_params['actual_depth_evaluated']:.1f} m)
+                📐 RATA-RATA TERBOBOT KETEBALAN PADA ZONA TELAPAK (0 - {avg_params['actual_depth_evaluated']:.1f} m)
             </div>
             <div style="display:flex; justify-content:space-around; align-items:center; margin:16px 0;">
                 <div style="text-align:center;">
-                    <div style="font-size:0.75rem; color:#94A3B8;">Sudut Geser Dalam (φ)</div>
-                    <div style="font-size:1.8rem; font-weight:800; color:#38BDF8;">{avg_params['phi']}°</div>
+                    <div style="font-size:0.75rem; color:#94A3B8;">Sudut Geser (φ)</div>
+                    <div style="font-size:1.8rem; font-weight:800; color:#38BDF8;">{final_phi}°</div>
+                    <div style="font-size:0.7rem; color:#94A3B8;">{"Undrained (φ=0)" if not use_effective else "Drained (φ' efektif)"}</div>
                 </div>
                 <div style="text-align:center; border-left:1px solid #334155; border-right:1px solid #334155; padding:0 20px;">
-                    <div style="font-size:0.75rem; color:#94A3B8;">Kohesi Tanah (c)</div>
-                    <div style="font-size:1.8rem; font-weight:800; color:#F472B6;">{avg_params['c']} <span style="font-size:0.9rem;">kPa</span></div>
+                    <div style="font-size:0.75rem; color:#94A3B8;">Kuat Geser / Kohesi (c)</div>
+                    <div style="font-size:1.8rem; font-weight:800; color:#F472B6;">{final_c} <span style="font-size:0.9rem;">kPa</span></div>
+                    <div style="font-size:0.7rem; color:#94A3B8;">Kuat Geser Undrained cu</div>
                 </div>
                 <div style="text-align:center;">
                     <div style="font-size:0.75rem; color:#94A3B8;">Berat Isi Basah (γ)</div>
                     <div style="font-size:1.8rem; font-weight:800; color:#34D399;">{avg_params['gamma']} <span style="font-size:0.9rem;">kN/m³</span></div>
+                    <div style="font-size:0.7rem; color:#94A3B8;">γsat: {avg_params['gamma_sat']} kN/m³</div>
                 </div>
             </div>
             <div style="font-size:0.85rem; color:#94A3B8; text-align:center; border-top:1px solid #334155; padding-top:8px;">
@@ -330,13 +353,30 @@ with tab_spt:
         </div>
         """)
 
+        # Panduan Ilmiah Tegangan Geser
+        with st.expander("💡 Penjelasan Ilmiah: Mengapa Sudut Geser / Tegangan Geser Muncul 0° pada Bore Log?"):
+            st.markdown("""
+            **1. Apakah Tegangan Geser Tanah Memang 0?**  
+            **TIDAK.** Tegangan geser / kuat geser tanah sama sekali TIDAK NOL. Nilai kuat geser tanah lempung dinyatakan oleh parameter **$c_u$ (undrained shear strength)** yang nilainya tertera pada tabel (misal 12.0 s/d 25.0 kPa). Nilai yang nol adalah **sudut geser dalam undrained ($\phi_u = 0^\circ$)** pada kondisi tanah lempung jenuh air jangka pendek (*kondisi $\phi = 0$ Skempton*).
+
+            **2. Rumus Kuat Geser dari Nilai N-SPT:**
+            - **Kuat Geser Undrained ($c_u$):**  
+              $c_u \approx 6.25 \times N \text{ (kPa)}$ *(Terzaghi & Peck, 1967)* atau $c_u = f_1 \times N$ *(Stroud, 1974, dengan $f_1 \approx 4.5 - 5.0$)*.
+            - **Sudut Geser Dalam Efektif ($\phi'$):**  
+              Dalam tinjauan jangka panjang (*drained / tegangan efektif*), lempung selalu memiliki sudut gesekan butiran efektif:  
+              $\phi' \approx 20^\circ - 32^\circ$ (korelasi Peck, Hanson, & Thornburn).  
+              Untuk tanah pasir: $\phi' = 27.1 + 0.3 N_{60} - 0.00054 N_{60}^2$ *(Wolff, 1989)*.
+            """)
+
         if st.button("🚀 Terapkan Parameter Hasil SPT Ini ke Perencanaan Pondasi", type="primary", use_container_width=True):
             st.session_state.soil_params = {
                 "status": "Siap Digunakan (Hasil SPT)",
                 "source": "Uji Penetrasi Standar (Boring SPT)",
                 "soil_type": f"Hasil Boring SPT ({avg_params['summary']})",
-                "cohesion": avg_params["c"],
-                "friction_angle": avg_params["phi"],
+                "cohesion": final_c,
+                "cu": final_c,
+                "friction_angle": final_phi,
+                "phi_eff": round(avg_params.get("phi_eff", 24.0), 1),
                 "unit_weight": avg_params["gamma"],
                 "sat_unit_weight": avg_params["gamma_sat"],
                 "water_table": mat_spt
@@ -344,14 +384,9 @@ with tab_spt:
             st.success("✅ Parameter berhasil ditransfer ke Tab Perencanaan Pondasi!")
 
     with col_res2:
-        st.markdown("#### 🖼️ Grafik Interaktif Profil Boring & Stratigrafi")
-        tab_g1, tab_g2 = st.tabs(["📊 Kurva N-SPT vs Kedalaman", "🧱 Kolom Stratigrafi"])
-        with tab_g1:
-            fig_spt = plot_spt_profile(st.session_state.spt_layers, gw_depth=mat_spt)
-            st.plotly_chart(fig_spt, use_container_width=True)
-        with tab_g2:
-            fig_strat = plot_stratigraphy_column(st.session_state.spt_layers)
-            st.plotly_chart(fig_strat, use_container_width=True)
+        st.markdown("#### 🖼️ Grafik Terpadu Profil Boring SPT & Stratigrafi (Satu Tampilan)")
+        fig_spt_unified = plot_single_unified_spt_chart(st.session_state.spt_layers, gw_depth=mat_spt)
+        st.plotly_chart(fig_spt_unified, use_container_width=True)
 
 
 # =========================================================================
@@ -416,14 +451,17 @@ with tab_cpt:
                         <th>JH (kg/cm²)</th>
                         <th>HP (kg/cm)</th>
                         <th>JHP Total</th>
-                        <th>HS / fs</th>
+                        <th>Tegangan fs (kPa)</th>
                         <th>FR (%)</th>
+                        <th>Kuat Geser cu (kPa)</th>
                         <th>Klasifikasi Robertson (1986)</th>
                     </tr>
                 </thead>
                 <tbody>
             """
             for pt in processed_cpt:
+                fs_disp = pt.get('fs_kpa', round(pt.get('hs', 0.0) * 98.07, 1))
+                cu_disp = pt.get('cu_kpa', round(max(10.0, (pt.get('qc', 0.0) * 98.07) / 16.0), 1))
                 cpt_html += f"""
                 <tr>
                     <td style="font-weight:700; color:#38BDF8;">{pt['depth']:.2f} m</td>
@@ -431,8 +469,9 @@ with tab_cpt:
                     <td>{pt['jh']:.1f}</td>
                     <td>{pt['hp']:.1f}</td>
                     <td style="color:#34D399; font-weight:700;">{pt['jhp']:.1f}</td>
-                    <td>{pt['hs']:.3f}</td>
+                    <td style="color:#38BDF8; font-weight:700;">{fs_disp:.1f}</td>
                     <td style="color:#EC4899; font-weight:700;">{pt['fr']:.2f}%</td>
+                    <td style="color:#F472B6; font-weight:700;">{cu_disp:.1f}</td>
                     <td style="font-size:0.8rem;"><span class="pill-status pill-safe">{pt['soil_type']}</span></td>
                 </tr>
                 """
@@ -470,39 +509,73 @@ with tab_cpt:
                 )
 
         # Rata-rata Zona Dangkal (0 - 3m)
-
-        # Rata-rata Zona Dangkal (0 - 3m)
         shallow_cpt = [p for p in processed_cpt if p["depth"] <= 3.0]
         if shallow_cpt:
             avg_qc = np.mean([p["qc"] for p in shallow_cpt])
             avg_fr = np.mean([p["fr"] for p in shallow_cpt])
-            avg_phi = np.mean([p["phi"] for p in shallow_cpt])
-            avg_c = np.mean([p["c"] for p in shallow_cpt])
-            avg_gamma = np.mean([p["gamma"] for p in shallow_cpt])
+            avg_phi = np.mean([p.get("phi", 0.0) for p in shallow_cpt])
+            avg_phi_eff = np.mean([p.get("phi_eff", 24.0) for p in shallow_cpt])
+            avg_c = np.mean([p.get("c", 35.0) for p in shallow_cpt])
+            avg_cu = np.mean([p.get("cu_kpa", avg_c) for p in shallow_cpt])
+            avg_fs = np.mean([p.get("fs_kpa", 20.0) for p in shallow_cpt])
+            avg_gamma = np.mean([p.get("gamma", 17.5) for p in shallow_cpt])
         else:
-            avg_qc, avg_fr, avg_phi, avg_c, avg_gamma = 15.0, 3.5, 0.0, 40.0, 17.5
+            avg_qc, avg_fr, avg_phi, avg_phi_eff, avg_c, avg_cu, avg_fs, avg_gamma = 15.0, 3.5, 0.0, 24.0, 40.0, 40.0, 25.0, 17.5
+
+        mode_cpt_drain = st.radio(
+            "Pilih Asumsi Analisis Tanah dari Data Sondir:",
+            [
+                "Analisis Tegangan Total (Undrained: φ = 0° untuk Lempung Jenuh, c = cu)",
+                "Analisis Tegangan Efektif (Drained: Sudut Geser Efektif φ' > 0°, c' ≈ 5-10 kPa)"
+            ],
+            index=0,
+            key="mode_cpt_drain"
+        )
+        use_eff_cpt = "Efektif" in mode_cpt_drain
+
+        final_cpt_c = round(avg_cu, 1) if not use_eff_cpt else 10.0
+        final_cpt_phi = round(avg_phi, 1) if not use_eff_cpt else round(avg_phi_eff, 1)
 
         st.html(f"""
         <div class="dark-card" style="border: 2px solid #06B6D4; margin-top:12px;">
             <div style="font-size:0.85rem; font-weight:800; color:#06B6D4; text-transform:uppercase;">
                 🎯 RANGKUMAN SONDIR ZONA FONDASI DANGKAL (0 - 3.0 m)
             </div>
-            <div style="display:flex; justify-content:space-between; margin-top:10px;">
+            <div style="display:flex; justify-content:space-between; margin-top:10px; flex-wrap:wrap; gap:8px;">
                 <span>Rata-rata qc: <strong style="color:#FBBF24;">{avg_qc:.1f} kg/cm²</strong></span>
+                <span>Tegangan Geser fs: <strong style="color:#38BDF8;">{avg_fs:.1f} kPa</strong></span>
+                <span>Kuat Geser cu: <strong style="color:#F472B6;">{avg_cu:.1f} kPa</strong></span>
                 <span>Rasio Gesek FR: <strong style="color:#EC4899;">{avg_fr:.2f}%</strong></span>
-                <span>Estimasi φ: <strong style="color:#38BDF8;">{avg_phi:.1f}°</strong></span>
-                <span>Estimasi c: <strong style="color:#F472B6;">{avg_c:.1f} kPa</strong></span>
+                <span>Estimasi φ: <strong style="color:#34D399;">{final_cpt_phi:.1f}°</strong></span>
             </div>
         </div>
         """)
+
+        with st.expander("💡 Penjelasan Ilmiah: Tegangan Geser & Kuat Geser dari Uji Sondir (CPT)"):
+            st.markdown("""
+            **1. Apakah Nilai Geser dari Sondir Bisa Ditemukan?**  
+            **BISA dan SANGAT JELAS.** Terdapat 2 parameter geser utama dari uji sondir:
+            - **Tegangan Geser Selimut Konus ($f_s$ / Hambatan Setempat):**  
+              Diukur langsung oleh selimut geser bikonus Begemann ($A_g = 100 \text{ cm}^2$):  
+              $$f_s = \frac{JH - q_c}{10} \text{ (kg/cm}^2\text{)} \times 98.07 \text{ (kPa)}$$  
+              Nilai ini menunjukkan gesekan geser langsung antara selimut konus baja dan butiran tanah.
+            - **Kuat Geser Undrained Tanah ($c_u$):**  
+              Dihitung menggunakan korelasi baku Robertson & Campanella (1986):  
+              $$c_u = \frac{q_c \times 98.07}{N_k} \text{ (kPa)}$$  
+              di mana faktor konus $N_k \approx 14 - 18$ (digunakan $N_k = 16$).
+            - **Sudut Geser Efektif ($\phi'$):**  
+              Untuk tanah berbutir/pasir, Robertson (1983) merumuskan $\phi' = \arctan[0.1 + 0.38 \log(q_c/\sigma'_{v0})]$ (berkisar antara $30^\circ - 42^\circ$).
+            """)
 
         if st.button("🚀 Terapkan Parameter Hasil Sondir ke Perencanaan Pondasi", type="primary", use_container_width=True):
             st.session_state.soil_params = {
                 "status": "Siap Digunakan (Hasil Sondir CPT)",
                 "source": "Uji Sondir Bikonus 2.5 Ton (CPT)",
                 "soil_type": f"Hasil Sondir (qc={avg_qc:.1f} kg/cm², FR={avg_fr:.2f}%)",
-                "cohesion": round(avg_c, 1),
-                "friction_angle": round(avg_phi, 1),
+                "cohesion": final_cpt_c,
+                "cu": round(avg_cu, 1),
+                "friction_angle": final_cpt_phi,
+                "phi_eff": round(avg_phi_eff, 1),
                 "unit_weight": round(avg_gamma, 1),
                 "sat_unit_weight": round(avg_gamma + 1.8, 1),
                 "water_table": mat_cpt

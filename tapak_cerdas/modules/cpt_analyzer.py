@@ -22,27 +22,34 @@ def classify_robertson_1986(qc_kg, fr_pct):
     """
     Klasifikasi Tanah menurut Robertson & Campanella (1986) berdasarkan qc (kg/cm2) dan FR (%).
     12 Zona Soil Behavior Type (SBT).
+    Mengembalikan: zone, phi_undrained, c, gamma, color, phi_eff, cu_kpa
     """
     if qc_kg <= 0:
-        return "Tidak Terdefinisi", 0.0, 0.0, 15.0, "#64748B"
+        return "Tidak Terdefinisi", 0.0, 0.0, 15.0, "#64748B", 20.0, 10.0
+
+    # Estimasi Kuat Geser Undrained (cu) dari CPT: cu = (qc * 98.07) / Nk (dengan Nk = 16)
+    cu_est = round(max(10.0, (qc_kg * 98.07) / 16.0), 1)
 
     # Klasifikasi Zona
     if fr_pct < 0.5:
         if qc_kg > 100:
             zone = "Pasir Berkerikil (Gravelly Sand)"
             phi = 38.0
+            phi_eff = 38.0
             c = 0.0
             gamma = 19.5
             color = "#B45309"
         elif qc_kg > 40:
             zone = "Pasir Bersih (Sand)"
             phi = 36.0
+            phi_eff = 36.0
             c = 0.0
             gamma = 19.0
             color = "#F59E0B"
         else:
             zone = "Tanah Butir Halus Sensitif"
             phi = 0.0
+            phi_eff = 24.0
             c = round(max(10.0, qc_kg * 4.0), 1)
             gamma = 15.5
             color = "#EF4444"
@@ -50,12 +57,14 @@ def classify_robertson_1986(qc_kg, fr_pct):
         if qc_kg > 50:
             zone = "Pasir s/d Pasir Berlanau"
             phi = 34.0
+            phi_eff = 34.0
             c = 0.0
             gamma = 18.5
             color = "#EAB308"
         else:
             zone = "Pasir Berlanau / Lanau Berpasir"
             phi = 30.0
+            phi_eff = 30.0
             c = 10.0
             gamma = 18.0
             color = "#84CC16"
@@ -63,18 +72,21 @@ def classify_robertson_1986(qc_kg, fr_pct):
         if qc_kg > 70:
             zone = "Pasir Berlempung (Clayey Sand)"
             phi = 32.0
+            phi_eff = 32.0
             c = 15.0
             gamma = 18.5
             color = "#D97706"
         elif qc_kg > 30:
             zone = "Lanau Berpasir s/d Lanau Lempungan"
             phi = 25.0
+            phi_eff = 26.0
             c = 25.0
             gamma = 17.5
             color = "#10B981"
         else:
             zone = "Lanau Berlempung (Clayey Silt)"
             phi = 12.0
+            phi_eff = 24.0
             c = 35.0
             gamma = 17.0
             color = "#06B6D4"
@@ -82,18 +94,21 @@ def classify_robertson_1986(qc_kg, fr_pct):
         if qc_kg > 50:
             zone = "Lempung Kaku (Stiff Fine Grained)"
             phi = 15.0
+            phi_eff = 26.0
             c = round(qc_kg * 5.0, 1)
             gamma = 18.5
             color = "#3B82F6"
         elif qc_kg > 15:
             zone = "Lempung Berlanau (Silty Clay)"
             phi = 0.0
+            phi_eff = 22.0
             c = round(max(20.0, qc_kg * 5.5), 1)
             gamma = 16.8
             color = "#6366F1"
         else:
             zone = "Lempung Lunak (Clay)"
             phi = 0.0
+            phi_eff = 20.0
             c = round(max(15.0, qc_kg * 5.0), 1)
             gamma = 16.2
             color = "#EC4899"
@@ -102,17 +117,19 @@ def classify_robertson_1986(qc_kg, fr_pct):
         if qc_kg < 15:
             zone = "Tanah Gambut / Organik"
             phi = 0.0
+            phi_eff = 18.0
             c = 12.0
             gamma = 14.5
             color = "#831843"
         else:
             zone = "Lempung Sangat Plastis"
             phi = 0.0
+            phi_eff = 21.0
             c = round(qc_kg * 5.0, 1)
             gamma = 16.5
             color = "#A855F7"
 
-    return zone, phi, c, gamma, color
+    return zone, phi, c, gamma, color, phi_eff, cu_est
 
 
 def compute_cpt_table(points_raw):
@@ -139,7 +156,10 @@ def compute_cpt_table(points_raw):
         jhp_running += hp
         fr = round((hs / qc * 100.0) if qc > 0 else 0.0, 2)
         
-        zone, phi, c, gamma, color = classify_robertson_1986(qc, fr)
+        zone, phi, c, gamma, color, phi_eff, cu_kpa = classify_robertson_1986(qc, fr)
+
+        # Tegangan Geser Selimut Konus (fs) dalam satuan kPa
+        fs_kpa = round(hs * 98.07, 1)
 
         processed.append({
             "depth": z,
@@ -148,12 +168,14 @@ def compute_cpt_table(points_raw):
             "hp": round(hp, 1),
             "jhp": round(jhp_running, 1),
             "hs": round(hs, 3),
-            "fs_kpa": round(hs * 98.07, 1),
+            "fs_kpa": fs_kpa,
             "qc_kpa": round(qc * 98.07, 1),
             "fr": fr,
             "soil_type": zone,
             "phi": phi,
+            "phi_eff": phi_eff,
             "c": c,
+            "cu_kpa": cu_kpa,
             "gamma": gamma,
             "color": color
         })
@@ -238,17 +260,22 @@ def plot_single_unified_cpt_chart(processed_data, gw_depth=1.5):
     max_fr = max(6.0, df["fr"].max() + 1.5)
 
     fig.update_layout(
-        title="<b>Grafik Terpadu Penyelidikan Sondir (CPT 2.5 Ton)</b>",
+        title=dict(
+            text="<b>Grafik Terpadu Penyelidikan Sondir (CPT 2.5 Ton)</b>",
+            font=dict(color="#F8FAFC", size=15)
+        ),
         yaxis=dict(
-            title="<b>Kedalaman Tanah (meter)</b>",
+            title=dict(text="<b>Kedalaman Tanah (meter)</b>"),
             autorange="reversed",
             gridcolor="#1E293B",
             zerolinecolor="#334155",
             range=[max_depth, 0.0]
         ),
         xaxis=dict(
-            title="<b>Tahanan Konus qc (kg/cm²) & Total Friksi JHP (kg/cm) [Sumbu Bawah]</b>",
-            titlefont=dict(color="#06B6D4"),
+            title=dict(
+                text="<b>Tahanan Konus qc (kg/cm²) & Total Friksi JHP (kg/cm) [Sumbu Bawah]</b>",
+                font=dict(color="#06B6D4")
+            ),
             tickfont=dict(color="#06B6D4"),
             gridcolor="#1E293B",
             zerolinecolor="#334155",
@@ -256,8 +283,10 @@ def plot_single_unified_cpt_chart(processed_data, gw_depth=1.5):
             side="bottom"
         ),
         xaxis2=dict(
-            title="<b>Rasio Gesekan FR (%) [Sumbu Atas]</b>",
-            titlefont=dict(color="#F59E0B"),
+            title=dict(
+                text="<b>Rasio Gesekan FR (%) [Sumbu Atas]</b>",
+                font=dict(color="#F59E0B")
+            ),
             tickfont=dict(color="#F59E0B"),
             overlaying="x",
             side="top",

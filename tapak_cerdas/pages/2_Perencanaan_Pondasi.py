@@ -199,7 +199,7 @@ with col_left:
     with c_s2:
         c_in = st.number_input("Kohesi (c kPa):", value=float(soil.get("cohesion", 18.0)), step=1.0)
         dw_in = st.number_input("Muka Air Tanah dw (m):", min_value=0.0, max_value=20.0, value=float(st.session_state.project_info.get("water_table_depth", 1.5)), step=0.25)
-        sf_in = st.selectbox("Safety Factor (SF):", [2.0, 3.0, 4.0], index=1)
+        sf_in = st.selectbox("Safety Factor (SF):", [2.0, 2.5, 3.0, 3.5], index=2)
 
     gamma_sat_in = gamma_in + 1.8
     hf = 0.40  # Tebal pelat telapak (m)
@@ -377,16 +377,20 @@ with col_right:
 
     st.markdown(f"### 📊 Hasil Komparasi 4 Metode Daya Dukung ({bentuk_fondasi.split('(')[0]})")
     
-    # Render Tabel Sesuai Format PDF
-    tbl_html = """
+    # Render Tabel Sesuai Format Profesional Geoteknik
+    tbl_html = f"""
     <div class="geo-table-dark-container">
     <table class="geo-table-dark">
         <thead>
             <tr>
-                <th style="text-align:left;">Metode</th>
+                <th style="text-align:left;">Metode Geoteknik</th>
+                <th>Nc</th>
+                <th>Nq</th>
+                <th>Nγ</th>
                 <th>qu (kPa)</th>
                 <th>qall (kPa)</th>
-                <th>Kapasitas Qall (SF=3)</th>
+                <th>Kapasitas Qall (SF={sf_in})</th>
+                <th>SF Terhitung</th>
                 <th>Status Keamanan</th>
             </tr>
         </thead>
@@ -397,14 +401,58 @@ with col_right:
         tbl_html += f"""
         <tr>
             <td style="text-align:left; font-weight:750; color:#F8FAFC;">{r['metode']}</td>
+            <td style="color:#A78BFA; font-weight:600;">{r['Nc']}</td>
+            <td style="color:#38BDF8; font-weight:600;">{r['Nq']}</td>
+            <td style="color:#34D399; font-weight:600;">{r['Ngamma']}</td>
             <td style="color:#E2E8F0; font-weight:600;">{r['qu']}</td>
             <td style="color:#38BDF8; font-weight:750;">{r['qall']}</td>
             <td style="color:#FBBF24; font-weight:700;">{r['Qall_kN']} kN</td>
+            <td style="color:#CBD5E1; font-weight:700;">{r['sf_aktual']}</td>
             <td><span class="pill-status {badge}">{r['status']}</span></td>
         </tr>
         """
     tbl_html += "</tbody></table></div>"
     st.html(tbl_html)
+
+    # Catatan Teknis Geoteknik Mengenai Nilai Nc, Nq, Ngamma
+    st.info(
+        f"💡 **Penjelasan Faktor Daya Dukung ($N_c, N_q, N_\\gamma$):**\\n"
+        f"- **$N_c$** : Pengaruh kohesi tanah ($c$).\\n"
+        f"- **$N_q$** : Pengaruh beban tanah overburden di samping fondasi ($p_o = \\gamma \\cdot D_f$).\\n"
+        f"- **$N_\\gamma$** : Pengaruh berat massa tanah di bawah dasar fondasi ($\\frac{{1}}{{2}} \\gamma B N_\\gamma$).\\n"
+        f"- **Mengapa $N_\\gamma = 0$ jika $\\phi = 0^\\circ$?**  "
+        f"Secara matematis, rumus $N_\\gamma$ berbanding lurus dengan $\\tan(\\phi)$. Pada Meyerhof: $N_\\gamma = (N_q - 1)\\tan(1.4\\phi)$, Vesic: $N_\\gamma = 2(N_q + 1)\\tan\\phi$, Hansen: $N_\\gamma = 1.5(N_q - 1)\\tan\\phi$. Karena $\\tan(0^\\circ) = 0$, maka saat sudut geser $\\phi = 0^\\circ$ (tanah lempung jenuh undrained), nilai $N_\\gamma$ secara eksak bernilai **0.0** (tidak ada perlawanan gesek baji tanah bawah). Jika tanah dianalisis dengan sudut geser efektif ($\\phi' > 0^\\circ$), maka $N_\\gamma$ otomatis bernilai positif."
+    )
+
+    with st.expander("📖 Rincian Rumus Matematis & Penjabaran 4 Metode Daya Dukung"):
+        st.markdown(r"""
+        #### 1. Persamaan Umum Kapasitas Dukung Tiga Suku:
+        $$q_u = c \cdot N_c \cdot s_c \cdot d_c \cdot i_c + p_o \cdot N_q \cdot s_q \cdot d_q \cdot i_q + 0.5 \cdot \gamma_{\text{bawah}} \cdot B \cdot N_\gamma \cdot s_\gamma \cdot d_\gamma \cdot i_\gamma$$
+        
+        Kapasitas dukung izin neto ($q_{\text{all}}$):
+        $$q_{\text{all}} = \frac{q_u - p_o}{\text{SF}} + p_o \quad (\text{dengan SF} = 2.0; 2.5; 3.0; 3.5)$$
+        
+        ---
+        #### 2. Perumusan Khusus Keempat Metode:
+        1. **Terzaghi (1943):**
+           - Bujur Sangkar ($B = L$): $q_u = 1.3 c N_c + p_o N_q + 0.4 \gamma B N_\gamma$
+           - Persegi Panjang: $q_u = c N_c (1 + 0.3 \frac{B}{L}) + p_o N_q + 0.5 \gamma B N_\gamma (1 - 0.2 \frac{B}{L})$
+           - Lingkaran: $q_u = 1.3 c N_c + p_o N_q + 0.3 \gamma B N_\gamma$
+           - Jalur / Strip: $q_u = c N_c + p_o N_q + 0.5 \gamma B N_\gamma$
+        2. **Meyerhof (1963):**
+           - $N_q = \tan^2(45^\circ + \phi/2) e^{\pi \tan\phi}$
+           - $N_c = (N_q - 1)\cot\phi$ (jika $\phi = 0^\circ \implies N_c = 5.14$)
+           - $N_\gamma = (N_q - 1)\tan(1.4\phi)$
+           - Faktor bentuk: $s_c = 1 + 0.2 K_p (B/L)$, $s_q = s_\gamma = 1 + 0.1 K_p (B/L)$ (untuk $\phi \ge 10^\circ$)
+           - Faktor kedalaman: $d_c = 1 + 0.2 \sqrt{K_p} (D_f/B)$, $d_q = d_\gamma = 1 + 0.1 \sqrt{K_p} (D_f/B)$
+        3. **Vesic (1975):**
+           - $N_\gamma = 2 (N_q + 1) \tan\phi$
+           - Faktor bentuk: $s_c = 1 + \frac{B}{L}\frac{N_q}{N_c}$, $s_q = 1 + \frac{B}{L}\tan\phi$, $s_\gamma = 1 - 0.4 \frac{B}{L}$
+           - Faktor kedalaman: $k = \min(1.0, D_f/B)$, $d_c = 1 + 0.4k$, $d_q = 1 + 2k\tan\phi(1-\sin\phi)^2$, $d_\gamma = 1.0$
+        4. **Brinch Hansen (1970):**
+           - Untuk $\phi = 0^\circ$: $q_u = 5.14 c (1 + 0.2 \frac{B}{L} + 0.4 k) + p_o$
+           - Untuk $\phi > 0^\circ$: $N_\gamma = 1.5(N_q - 1)\tan\phi$, $s_c = 1 + \frac{B}{L}\frac{N_q}{N_c}$, $s_q = 1 + \frac{B}{L}\sin\phi$, $s_\gamma = 1 - 0.4 \frac{B}{L}$
+        """)
 
     vol_beton = area_f * hf
     
@@ -571,7 +619,7 @@ with col_right:
             "pu_column": pu_terfaktor
         },
         comp_results=table_comp,
-        selected_dim={"B": lebar_b, "L": panjang_l, "Df": df_in, "SF": sf_in}
+        selected_dim={"B": lebar_b, "L": panjang_l, "Df": df_in, "SF": sf_in, "shape": bentuk_fondasi}
     )
     
     csv_str = generate_csv_report(

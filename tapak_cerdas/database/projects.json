@@ -1,0 +1,58 @@
+[
+  {
+    "name": "Pembangunan Ruko 3 Lantai Magelang",
+    "location": "Secang Kabupaten Magelang",
+    "notes": "Perencanaan awal pondasi telapak aman di 4 metode.",
+    "soil_params": {
+      "status": "Siap Digunakan (Hasil SPT)",
+      "source": "Uji Penetrasi Standar (Boring SPT)",
+      "soil_type": "Hasil Boring SPT (LANAU Kelempungan, LEMPUNG Kepasiran Halus)",
+      "cohesion": 16.3,
+      "friction_angle": 0.0,
+      "unit_weight": 15.3,
+      "sat_unit_weight": 16.8,
+      "water_table": 1.5
+    },
+    "load_params": {
+      "status": "Tersedia (Estimasi Otomatis)",
+      "building_function": "Toko / Bangunan Komersial / Retail (4.79 kN/m²)",
+      "floors": 3,
+      "floor_area": 120.0,
+      "total_area": 360.0,
+      "dead_load_unit": 7.85,
+      "live_load_unit": 4.79,
+      "p_column": 464.5,
+      "pu_column": 627.8
+    },
+    "water_table_depth": 1.5,
+    "saved_at": "2026-11-06 22:45:08"
+  },
+  {
+    "name": "Pembangunan Ruko 3 Lantai Cerdas",
+    "location": "Kawasan Komersial Mandiri",
+    "notes": "Perencanaan awal pondasi telapak aman di 4 metode.",
+    "soil_params": {
+      "status": "Siap Digunakan",
+      "source": "Katalog Lapangan Praktis",
+      "soil_type": "Tanah Lempung Sedang / Teguh",
+      "cohesion": 35.0,
+      "friction_angle": 12.0,
+      "unit_weight": 17.5,
+      "sat_unit_weight": 19.0,
+      "water_table": 1.5
+    },
+    "load_params": {
+      "status": "Tersedia (Estimasi Otomatis)",
+      "building_function": "Toko / Bangunan Komersial / Retail (4.79 kN/m²)",
+      "floors": 3,
+      "floor_area": 120.0,
+      "total_area": 360.0,
+      "dead_load_unit": 7.85,
+      "live_load_unit": 4.79,
+      "p_column": 464.5,
+      "pu_column": 627.8
+    },
+    "water_table_depth": 1.5,
+    "saved_at": "2026-11-06 21:25:12"
+  }
+]

@@ -1,5 +1,26 @@
 [
   {
+    "client_name": "Budi Santoso",
+    "client_wa": "081234567890",
+    "notes": "Mohon bantuan review fondasi untuk ruko 3 lantai di tanah pekarangan sedang.",
+    "project_name": "Pembangunan Ruko 3 Lantai Magelang",
+    "location": "Secang Kabupaten Magelang",
+    "building_function": "Ruang Kantor (2.40 kN/m²)",
+    "floors": 3,
+    "p_column": 379.20000000000005,
+    "width_b": 1.5,
+    "length_l": 1.5,
+    "depth_df": 2.0,
+    "cohesion": 16.3,
+    "friction_angle": 0.0,
+    "unit_weight": 15.3,
+    "water_table": 1.5,
+    "min_sf": 0.73,
+    "status": "PERLU DIPERBESAR",
+    "submitted_at": "2026-11-06 22:44:09",
+    "id": "SUB-0002"
+  },
+  {
     "client_name": "Abrar Tanjung S. T",
     "client_wa": "085640762669",
     "notes": "Mohon bantuan review fondasi untuk ruko 3 lantai di tanah pekarangan sedang.",
