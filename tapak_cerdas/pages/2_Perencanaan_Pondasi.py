@@ -21,20 +21,9 @@ import math
 import urllib.parse
 
 # Tambahkan path root
-ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
-
-import importlib
-import modules.bearing_capacity
-import modules.visualizer
-import modules.deep_foundation
-import utils.excel_exporter
-
-importlib.reload(modules.bearing_capacity)
-importlib.reload(modules.visualizer)
-importlib.reload(modules.deep_foundation)
-importlib.reload(utils.excel_exporter)
 
 from modules.bearing_capacity import calculate_terzaghi, calculate_meyerhof, calculate_vesic, calculate_hansen
 from modules.visualizer import (

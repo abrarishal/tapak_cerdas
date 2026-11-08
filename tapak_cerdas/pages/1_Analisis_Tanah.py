@@ -15,18 +15,9 @@ import numpy as np
 import os
 import sys
 
-ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
-
-import importlib
-import modules.spt_analyzer
-import modules.cpt_analyzer
-import utils.excel_exporter
-
-importlib.reload(modules.spt_analyzer)
-importlib.reload(modules.cpt_analyzer)
-importlib.reload(utils.excel_exporter)
 
 from modules.spt_analyzer import (
     compute_spt_layer,
@@ -355,7 +346,7 @@ with tab_spt:
 
         # Panduan Ilmiah Tegangan Geser
         with st.expander("💡 Penjelasan Ilmiah: Mengapa Sudut Geser / Tegangan Geser Muncul 0° pada Bore Log?"):
-            st.markdown("""
+            st.markdown(r"""
             **1. Apakah Tegangan Geser Tanah Memang 0?**  
             **TIDAK.** Tegangan geser / kuat geser tanah sama sekali TIDAK NOL. Nilai kuat geser tanah lempung dinyatakan oleh parameter **$c_u$ (undrained shear strength)** yang nilainya tertera pada tabel (misal 12.0 s/d 25.0 kPa). Nilai yang nol adalah **sudut geser dalam undrained ($\phi_u = 0^\circ$)** pada kondisi tanah lempung jenuh air jangka pendek (*kondisi $\phi = 0$ Skempton*).
 
@@ -552,7 +543,7 @@ with tab_cpt:
         """)
 
         with st.expander("💡 Penjelasan Ilmiah: Tegangan Geser & Kuat Geser dari Uji Sondir (CPT)"):
-            st.markdown("""
+            st.markdown(r"""
             **1. Apakah Nilai Geser dari Sondir Bisa Ditemukan?**  
             **BISA dan SANGAT JELAS.** Terdapat 2 parameter geser utama dari uji sondir:
             - **Tegangan Geser Selimut Konus ($f_s$ / Hambatan Setempat):**  

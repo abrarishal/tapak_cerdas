@@ -14,17 +14,9 @@ import pandas as pd
 import os
 import sys
 
-ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
-
-import importlib
-import database.db_manager
-import utils.excel_exporter
-import modules.bearing_capacity
-
-importlib.reload(database.db_manager)
-importlib.reload(utils.excel_exporter)
 
 from database.db_manager import (
     load_all_projects,
