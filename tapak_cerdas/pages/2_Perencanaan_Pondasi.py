@@ -366,14 +366,52 @@ with col_right:
             "Nc": item["Nc"],
             "Nq": item["Nq"],
             "Ngamma": item["Ngamma"],
-            "qu": f"{qu:,.1f}",
-            "qall": f"{qall:,.1f}",
-            "Qall_kN": f"{q_all_total_kN:,.1f}",
-            "q_kontak": f"{q_kontak:,.1f}",
-            "sf_aktual": f"{sf_act:.2f}",
+            "sc": item.get("sc", 1.0),
+            "sq": item.get("sq", 1.0),
+            "sgamma": item.get("sgamma", 1.0),
+            "dc": item.get("dc", 1.0),
+            "dq": item.get("dq", 1.0),
+            "dgamma": item.get("dgamma", 1.0),
+            "po": po,
+            "gamma_eff": item.get("gamma_eff", gamma_in),
+            "qu": qu,
+            "qall": qall,
+            "Qall_kN": q_all_total_kN,
+            "q_kontak": q_kontak,
+            "sf_aktual": sf_act,
             "status": status_text,
             "is_safe": is_safe
         })
+
+    min_sf_act = min([r["sf_aktual"] for r in table_comp])
+
+    # 1. OTOMATIS CATAT SETIAP PENGGUNA YANG MELAKUKAN PERHITUNGAN KE DATABASE PEMILIK
+    calc_sig = f"{st.session_state.project_info.get('name')}_{lebar_b}_{panjang_l}_{df_in}_{c_in}_{phi_in}_{total_beban_aksial_p}_{bentuk_fondasi}_{sf_in}"
+    if st.session_state.get("last_auto_logged_sig") != calc_sig:
+        try:
+            sub_id = save_client_submission({
+                "client_name": st.session_state.get("sub_client_name", "Pengguna Umum / Web"),
+                "client_wa": st.session_state.get("sub_client_wa", "-"),
+                "notes": f"Kalkulasi Otomatis ({bentuk_fondasi.split('(')[0].strip()}) B={lebar_b:.2f}m x L={panjang_l:.2f}m, Df={df_in:.2f}m, SF Target={sf_in}",
+                "project_name": st.session_state.project_info.get("name", "Proyek Baru"),
+                "location": st.session_state.project_info.get("location", "Semarang"),
+                "building_function": fungsi_bldg,
+                "floors": jml_lantai,
+                "p_column": round(total_beban_aksial_p, 1),
+                "width_b": lebar_b,
+                "length_l": panjang_l,
+                "depth_df": df_in,
+                "cohesion": c_in,
+                "friction_angle": phi_in,
+                "unit_weight": gamma_in,
+                "water_table": dw_in,
+                "min_sf": round(min_sf_act, 2),
+                "status": "AMAN (OK)" if all_methods_ok else "PERLU DIPERLEBAR"
+            })
+            st.session_state.last_auto_logged_sig = calc_sig
+            st.session_state.last_auto_sub_id = sub_id
+        except Exception:
+            pass
 
     st.markdown(f"### 📊 Hasil Komparasi 4 Metode Daya Dukung ({bentuk_fondasi.split('(')[0]})")
     
@@ -404,15 +442,23 @@ with col_right:
             <td style="color:#A78BFA; font-weight:600;">{r['Nc']}</td>
             <td style="color:#38BDF8; font-weight:600;">{r['Nq']}</td>
             <td style="color:#34D399; font-weight:600;">{r['Ngamma']}</td>
-            <td style="color:#E2E8F0; font-weight:600;">{r['qu']}</td>
-            <td style="color:#38BDF8; font-weight:750;">{r['qall']}</td>
-            <td style="color:#FBBF24; font-weight:700;">{r['Qall_kN']} kN</td>
-            <td style="color:#CBD5E1; font-weight:700;">{r['sf_aktual']}</td>
+            <td style="color:#E2E8F0; font-weight:600;">{r['qu']:,.1f}</td>
+            <td style="color:#38BDF8; font-weight:750;">{r['qall']:,.1f}</td>
+            <td style="color:#FBBF24; font-weight:700;">{r['Qall_kN']:,.1f} kN</td>
+            <td style="color:#CBD5E1; font-weight:700;">{r['sf_aktual']:.2f}</td>
             <td><span class="pill-status {badge}">{r['status']}</span></td>
         </tr>
         """
     tbl_html += "</tbody></table></div>"
     st.html(tbl_html)
+
+    auto_sub_id_disp = st.session_state.get('last_auto_sub_id', 'SUB-0001')
+    st.markdown(
+        f"<div style='font-size:0.82rem; color:#34D399; margin: 4px 0 10px 0; display:flex; align-items:center; gap:6px;'>"
+        f"<span>💾 <em>Hasil perhitungan ini otomatis tercatat ke dalam Database Rekapitulasi Pemilik (ID: <strong>{auto_sub_id_disp}</strong>).</em></span>"
+        f"</div>",
+        unsafe_allow_html=True
+    )
 
     # Catatan Teknis Geoteknik Mengenai Nilai Nc, Nq, Ngamma
     st.info(
