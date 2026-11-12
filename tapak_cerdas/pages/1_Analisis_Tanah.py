@@ -32,6 +32,7 @@ from modules.cpt_analyzer import (
     plot_single_unified_cpt_chart,
     SAMPLE_SONDIR_2_5TON
 )
+from modules.subsurface_3d import plot_subsurface_block_3d
 from utils.excel_exporter import generate_spt_excel, generate_cpt_excel
 
 # Konfigurasi Halaman
@@ -274,9 +275,9 @@ with tab_spt:
         if len(st.session_state.spt_layers) > 0:
             spt_xlsx = generate_spt_excel(st.session_state.spt_layers, st.session_state.project_info)
             st.download_button(
-                label="📊 Unduh Excel SPT (.xlsx)",
+                label="📊 Unduh Laporan Soil Investigation 5-Sheets (.xlsx)",
                 data=spt_xlsx,
-                file_name=f"Bore_Log_SPT_{st.session_state.project_info['name'].replace(' ', '_')}.xlsx",
+                file_name=f"Soil_Investigation_Report_{st.session_state.project_info['name'].replace(' ', '_')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
@@ -375,9 +376,23 @@ with tab_spt:
             st.success("✅ Parameter berhasil ditransfer ke Tab Perencanaan Pondasi!")
 
     with col_res2:
-        st.markdown("#### 🖼️ Grafik Terpadu Profil Boring SPT & Stratigrafi (Satu Tampilan)")
-        fig_spt_unified = plot_single_unified_spt_chart(st.session_state.spt_layers, gw_depth=mat_spt)
-        st.plotly_chart(fig_spt_unified, use_container_width=True)
+        st.markdown("#### 🖼️ Visualisasi Bawah Permukaan Tanah (2D & 3D)")
+        tab_v_2d, tab_v_3d = st.tabs([
+            "📈 Grafik 2D Terpadu (N-SPT & Stratigrafi)",
+            "🌍 Model Blok 3D Bawah Permukaan"
+        ])
+        with tab_v_2d:
+            fig_spt_unified = plot_single_unified_spt_chart(st.session_state.spt_layers, gw_depth=mat_spt)
+            st.plotly_chart(fig_spt_unified, use_container_width=True)
+        with tab_v_3d:
+            st.caption("💡 **Model 3D Bawah Permukaan:** Putar 360°, zoom in/out, atau geser untuk memeriksa lapisan tanah dan penetrasi bor secara proporsional.")
+            fig_spt_3d = plot_subsurface_block_3d(
+                layers=st.session_state.spt_layers,
+                gw_depth=mat_spt,
+                borehole_id=st.session_state.project_info.get("borehole_id", "BH-01"),
+                test_type="SPT"
+            )
+            st.plotly_chart(fig_spt_3d, use_container_width=True)
 
 
 # =========================================================================
@@ -482,9 +497,9 @@ with tab_cpt:
             with col_cpt_b3:
                 cpt_xlsx = generate_cpt_excel(processed_cpt, st.session_state.project_info)
                 st.download_button(
-                    label="📊 Unduh Excel Sondir (.xlsx)",
+                    label="📊 Unduh Laporan Soil Investigation 5-Sheets (.xlsx)",
                     data=cpt_xlsx,
-                    file_name=f"Hasil_Uji_Sondir_CPT_{st.session_state.project_info['name'].replace(' ', '_')}.xlsx",
+                    file_name=f"Soil_Investigation_Report_{st.session_state.project_info['name'].replace(' ', '_')}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True
                 )
@@ -574,9 +589,24 @@ with tab_cpt:
             st.success("✅ Parameter Sondir CPT berhasil ditransfer ke Tab Perencanaan Pondasi!")
 
     with col_graph_cpt:
-        st.markdown("#### 📈 Grafik Terpadu Uji Sondir (qc, JHP, & FR)")
-        fig_cpt_single = plot_single_unified_cpt_chart(processed_cpt, gw_depth=mat_cpt)
-        st.plotly_chart(fig_cpt_single, use_container_width=True)
+        st.markdown("#### 🖼️ Visualisasi Penetrasi Sondir (2D & 3D)")
+        tab_cpt_2d, tab_cpt_3d = st.tabs([
+            "📈 Grafik 2D Terpadu (qc, JHP, & FR)",
+            "🌍 Model Blok 3D Sondir Bawah Permukaan"
+        ])
+        with tab_cpt_2d:
+            fig_cpt_single = plot_single_unified_cpt_chart(processed_cpt, gw_depth=mat_cpt)
+            st.plotly_chart(fig_cpt_single, use_container_width=True)
+        with tab_cpt_3d:
+            st.caption("💡 **Model 3D Bawah Permukaan CPT:** Menampilkan variasi nilai tahanan konus qc dan klasifikasi tanah sepanjang penetrasi konus dalam ruang 3D.")
+            fig_cpt_3d = plot_subsurface_block_3d(
+                layers=None,
+                gw_depth=mat_cpt,
+                borehole_id="Titik Sondir S-01",
+                test_type="CPT",
+                cpt_points=processed_cpt
+            )
+            st.plotly_chart(fig_cpt_3d, use_container_width=True)
 
         # Kartu Legenda Keterangan Warna Lengkap
         st.html("""

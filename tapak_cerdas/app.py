@@ -138,8 +138,8 @@ st.html(r"""
             ● LIVE CLOUD SYSTEM &bull; SNI 1727:2020 & 2827:2008
         </div>
     </div>
-    <h1>Perancangan Daya Dukung Fondasi Dangkal Otomatis, Presisi & Efisien</h1>
-    <p>Aplikasi Tapak Cerdas mengintegrasikan penyelidikan tanah geoteknik (Boring N-SPT & Sondir CPT), estimasi otomatis beban bangunan bertingkat sesuai SNI 1727:2020, serta komparasi 4 teori daya dukung klasik: <strong>Terzaghi (1943), Meyerhof (1963), Vesic (1975), dan Hansen (1970)</strong> dalam antarmuka grafis 3D interaktif.</p>
+    <h1>Perancangan Fondasi Dangkal & Desain Penulangan Otomatis, Presisi & Efisien</h1>
+    <p>Aplikasi Tapak Cerdas mengintegrasikan penyelidikan tanah geoteknik (Boring N-SPT & Sondir CPT), estimasi otomatis beban bangunan bertingkat SNI 1727:2020, komparasi 4 teori daya dukung klasik: <strong>Terzaghi (1943), Meyerhof (1963), Vesic (1975), dan Hansen (1970)</strong>, <strong>desain penulangan struktur beton fondasi SNI 2847:2019</strong>, visualisasi <strong>Model 3D Cutaway</strong>, serta ekspor laporan resmi Excel dengan rumus aktif.</p>
 </div>
 """)
 
@@ -147,24 +147,24 @@ st.html(r"""
 st.html("""
 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; margin-bottom:1.6rem;">
     <div class="dark-card" style="border-left:4px solid #38BDF8; padding:14px 18px; margin-bottom:0;">
-        <div style="font-size:0.75rem; color:#94A3B8; font-weight:800; text-transform:uppercase;">Tahap 1 &bull; Penyelidikan</div>
-        <div style="font-weight:800; color:#38BDF8; font-size:1.05rem; margin-top:2px;">🔬 Analisis Tanah</div>
-        <div style="font-size:0.8rem; color:#CBD5E1; margin-top:4px;">Uji N-SPT, Bore Log Undip, Sondir CPT Bikonus, & Interpolasi c, φ, γ.</div>
+        <div style="font-size:0.75rem; color:#94A3B8; font-weight:800; text-transform:uppercase;">Tahap 1 &bull; Penyelidikan Tanah</div>
+        <div style="font-weight:800; color:#38BDF8; font-size:1.05rem; margin-top:2px;">🔬 Analisis Tanah & 3D</div>
+        <div style="font-size:0.8rem; color:#CBD5E1; margin-top:4px;">Uji N-SPT, CPT, model blok geologi 3D bawah permukaan, & laporan 5-sheet .xlsx.</div>
     </div>
     <div class="dark-card" style="border-left:4px solid #F59E0B; padding:14px 18px; margin-bottom:0;">
-        <div style="font-size:0.75rem; color:#94A3B8; font-weight:800; text-transform:uppercase;">Tahap 2 &bull; Struktur</div>
-        <div style="font-weight:800; color:#FBBF24; font-size:1.05rem; margin-top:2px;">🏢 Beban SNI 1727</div>
-        <div style="font-size:0.8rem; color:#CBD5E1; margin-top:4px;">Estimasi otomatis beban mati & hidup gedung bertingkat per kolom kritis.</div>
+        <div style="font-size:0.75rem; color:#94A3B8; font-weight:800; text-transform:uppercase;">Tahap 2 &bull; Beban & Dimensi</div>
+        <div style="font-weight:800; color:#FBBF24; font-size:1.05rem; margin-top:2px;">🏢 Beban SNI 1727 & Daya Dukung</div>
+        <div style="font-size:0.8rem; color:#CBD5E1; margin-top:4px;">Estimasi beban gedung, komparasi 4 metode fondasi, dan fitur Auto-Optimasi tapak.</div>
     </div>
     <div class="dark-card" style="border-left:4px solid #00E5FF; padding:14px 18px; margin-bottom:0;">
-        <div style="font-size:0.75rem; color:#94A3B8; font-weight:800; text-transform:uppercase;">Tahap 3 &bull; Desain CAD</div>
-        <div style="font-weight:800; color:#00E5FF; font-size:1.05rem; margin-top:2px;">🏛️ Studio 3D Fondasi</div>
-        <div style="font-size:0.8rem; color:#CBD5E1; margin-top:4px;">Simulasi 3D Silinder/Persegi/Jalur, 4 metode daya dukung & Boussinesq.</div>
+        <div style="font-size:0.75rem; color:#94A3B8; font-weight:800; text-transform:uppercase;">Tahap 3 &bull; Struktur & 3D Cutaway</div>
+        <div style="font-weight:800; color:#00E5FF; font-size:1.05rem; margin-top:2px;">🏗️ Penulangan & 3D Cutaway</div>
+        <div style="font-size:0.8rem; color:#CBD5E1; margin-top:4px;">Desain tulangan SNI 2847, kontrol punching shear, dan model 3D cutaway fondasi.</div>
     </div>
     <div class="dark-card" style="border-left:4px solid #10B981; padding:14px 18px; margin-bottom:0;">
-        <div style="font-size:0.75rem; color:#94A3B8; font-weight:800; text-transform:uppercase;">Tahap 4 &bull; Selesai</div>
-        <div style="font-weight:800; color:#34D399; font-size:1.05rem; margin-top:2px;">📊 Laporan & Excel</div>
-        <div style="font-size:0.8rem; color:#CBD5E1; margin-top:4px;">Ekspor lembar kalkulasi resmi .xlsx, CSV, & kotak masuk pengajuan klien.</div>
+        <div style="font-size:0.75rem; color:#94A3B8; font-weight:800; text-transform:uppercase;">Tahap 4 &bull; Selesai & BoQ</div>
+        <div style="font-weight:800; color:#34D399; font-size:1.05rem; margin-top:2px;">📊 Laporan Excel Rumus Aktif</div>
+        <div style="font-size:0.8rem; color:#CBD5E1; margin-top:4px;">Ekspor laporan kalkulasi resmi 6-sheets dengan rumus aktif dan rekapitulasi BoQ.</div>
     </div>
 </div>
 """)

@@ -26,8 +26,10 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from modules.bearing_capacity import calculate_terzaghi, calculate_meyerhof, calculate_vesic, calculate_hansen
+from modules.reinforcement_design import design_footing_reinforcement
 from modules.visualizer import (
     plot_foundation_3d,
+    plot_cutaway_foundation_3d,
     plot_foundation_plan_view,
     plot_foundation_cross_section,
     plot_boussinesq_stress_bulb,
@@ -191,7 +193,25 @@ with col_left:
         sf_in = st.selectbox("Safety Factor (SF):", [2.0, 2.5, 3.0, 3.5], index=2)
 
     gamma_sat_in = gamma_in + 1.8
-    hf = 0.40  # Tebal pelat telapak (m)
+    
+    # Input Tebal Fondasi & Parameter Struktur SNI 2847:2019
+    hf = st.slider("Tebal Pelat Fondasi hf (m):", min_value=0.30, max_value=1.20, value=0.45, step=0.05)
+
+    with st.expander("🏗️ Data Material Struktur & Kolom Pedestal (SNI 2847:2019)", expanded=False):
+        c_mat1, c_mat2 = st.columns(2)
+        with c_mat1:
+            fc_val = st.selectbox("Mutu Beton f'c (MPa):", [20.0, 25.0, 30.0, 35.0], index=1)
+            fy_val = st.selectbox("Mutu Baja Tulangan fy (MPa):", [280.0, 420.0], index=1)
+            cover_val = st.number_input("Selimut Beton Bersih (mm):", min_value=50.0, max_value=100.0, value=75.0, step=5.0)
+        with c_mat2:
+            bar_dia_val = st.selectbox("Diameter Tulangan Lentur (D):", [13.0, 16.0, 19.0, 22.0, 25.0], index=1)
+            col_b_val = st.number_input("Lebar Kolom Pedestal bc (m):", min_value=0.20, max_value=1.50, value=0.40, step=0.05)
+            col_h_val = st.number_input("Panjang Kolom Pedestal hc (m):", min_value=0.20, max_value=1.50, value=0.40, step=0.05)
+        c_mom1, c_mom2 = st.columns(2)
+        with c_mom1:
+            mux_val = st.number_input("Momen Terfaktor Mux (kN.m):", value=15.0, step=2.5)
+        with c_mom2:
+            muy_val = st.number_input("Momen Terfaktor Muy (kN.m):", value=10.0, step=2.5)
 
     # REVISI PENGGUNA: Dukungan Berbagai Bentuk Fondasi
     st.markdown("#### 📐 Pilihan Bentuk & Geometri Fondasi:")
@@ -459,6 +479,102 @@ with col_right:
         f"Secara matematis, rumus $N_\\gamma$ berbanding lurus dengan $\\tan(\\phi)$. Pada Meyerhof: $N_\\gamma = (N_q - 1)\\tan(1.4\\phi)$, Vesic: $N_\\gamma = 2(N_q + 1)\\tan\\phi$, Hansen: $N_\\gamma = 1.5(N_q - 1)\\tan\\phi$. Karena $\\tan(0^\\circ) = 0$, maka saat sudut geser $\\phi = 0^\\circ$ (tanah lempung jenuh undrained), nilai $N_\\gamma$ secara eksak bernilai **0.0** (tidak ada perlawanan gesek baji tanah bawah). Jika tanah dianalisis dengan sudut geser efektif ($\\phi' > 0^\\circ$), maka $N_\\gamma$ otomatis bernilai positif."
     )
 
+    # =========================================================================
+    # MODUL DESAIN PENULANGAN PONDASI (SNI 2847:2019)
+    # =========================================================================
+    reinf_results = design_footing_reinforcement(
+        B_m=lebar_b,
+        L_m=panjang_l,
+        hf_m=hf,
+        col_b_m=col_b_val,
+        col_h_m=col_h_val,
+        Pu_kN=pu_terfaktor,
+        Mux_kNm=mux_val,
+        Muy_kNm=muy_val,
+        fc_MPa=fc_val,
+        fy_MPa=fy_val,
+        cover_mm=cover_val,
+        bar_dia_mm=bar_dia_val
+    )
+
+    st.markdown("### 🏗️ Desain Penulangan Struktur Fondasi Telapak (SNI 2847:2019)")
+    
+    # Banner Rekomendasi Utama Desain
+    rf_sum = reinf_results["summary"]
+    punch_res = reinf_results["punching_shear"]
+    shear_res = reinf_results["one_way_shear"]
+    reinf_x = reinf_results["flexure_rebar"]["dir_x"]
+    reinf_y = reinf_results["flexure_rebar"]["dir_y"]
+    boq = reinf_results["quantities"]
+
+    st.html(f"""
+    <div class="dark-card" style="border: 2px solid #10B981; background: rgba(6, 78, 59, 0.25); margin-bottom:16px;">
+        <div style="font-size:0.85rem; font-weight:800; color:#34D399; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px;">
+            📌 REKOMENDASI PENULANGAN FONDASI ({reinf_results['standard']})
+        </div>
+        <div style="display:flex; justify-content:space-around; align-items:center; flex-wrap:wrap; gap:16px; margin: 12px 0;">
+            <div style="text-align:center;">
+                <div style="font-size:0.8rem; color:#94A3B8;">Tulangan Bawah Arah X</div>
+                <div style="font-size:1.6rem; font-weight:800; color:#38BDF8;">{rf_sum['rebar_x']}</div>
+                <div style="font-size:0.75rem; color:#94A3B8;">As perlu: {reinf_x['As_req_mm2']:.0f} mm² (Ada: {reinf_x['As_provided_mm2']:.0f} mm²)</div>
+            </div>
+            <div style="text-align:center; border-left:1px solid #334155; border-right:1px solid #334155; padding:0 24px;">
+                <div style="font-size:0.8rem; color:#94A3B8;">Tulangan Bawah Arah Y</div>
+                <div style="font-size:1.6rem; font-weight:800; color:#FBBF24;">{rf_sum['rebar_y']}</div>
+                <div style="font-size:0.75rem; color:#94A3B8;">As perlu: {reinf_y['As_req_mm2']:.0f} mm² (Ada: {reinf_y['As_provided_mm2']:.0f} mm²)</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="font-size:0.8rem; color:#94A3B8;">Tebal Pelat Fondasi (hf)</div>
+                <div style="font-size:1.6rem; font-weight:800; color:#F472B6;">{hf*100:.0f} cm</div>
+                <div style="font-size:0.75rem; color:#94A3B8;">Selimut Beton: {int(cover_val)} mm (Kontak Tanah)</div>
+            </div>
+        </div>
+        <div style="border-top:1px solid #334155; padding-top:10px; display:flex; justify-content:space-between; align-items:center; font-size:0.88rem;">
+            <span>Status Keseluruhan Struktur: <strong style="color:{'#34D399' if rf_sum['is_all_safe'] else '#EF4444'};">{rf_sum['status']}</strong></span>
+            <span>Penjangkaran: <strong style="color:#E2E8F0;">{reinf_results['development_length']['recommendation']}</strong></span>
+        </div>
+    </div>
+    """)
+
+    # 3 Kartu Pemeriksaan Kapasitas Struktur
+    col_chk1, col_chk2, col_chk3 = st.columns(3)
+    with col_chk1:
+        st.html(f"""
+        <div class="dark-card" style="border-left:4px solid {'#10B981' if punch_res['is_safe'] else '#EF4444'};">
+            <div style="font-size:0.8rem; color:#94A3B8;">Kontrol Geser Pons (Punching)</div>
+            <div style="font-size:1.25rem; font-weight:800; color:{'#34D399' if punch_res['is_safe'] else '#EF4444'};">{punch_res['status']}</div>
+            <div style="font-size:0.82rem; color:#CBD5E1; margin-top:4px;">
+                Vu2 = <strong>{punch_res['Vu2_kN']:.1f} kN</strong><br>
+                φVc2 = <strong>{punch_res['phi_Vc2_kN']:.1f} kN</strong><br>
+                Rasio Pembebanan: <strong>{punch_res['ratio']:.2f}</strong>
+            </div>
+        </div>
+        """)
+    with col_chk2:
+        st.html(f"""
+        <div class="dark-card" style="border-left:4px solid {'#10B981' if shear_res['is_safe'] else '#EF4444'};">
+            <div style="font-size:0.8rem; color:#94A3B8;">Kontrol Geser 1 Arah (Beam Shear)</div>
+            <div style="font-size:1.25rem; font-weight:800; color:{'#34D399' if shear_res['is_safe'] else '#EF4444'};">{shear_res['status']}</div>
+            <div style="font-size:0.82rem; color:#CBD5E1; margin-top:4px;">
+                Vu1 (X) = <strong>{shear_res['shear_x']['Vu1_kN']:.1f} kN</strong><br>
+                φVc1 (X) = <strong>{shear_res['shear_x']['phi_Vc1_kN']:.1f} kN</strong><br>
+                Rasio: <strong>{shear_res['shear_x']['ratio']:.2f}</strong>
+            </div>
+        </div>
+        """)
+    with col_chk3:
+        st.html(f"""
+        <div class="dark-card" style="border-left:4px solid #38BDF8;">
+            <div style="font-size:0.8rem; color:#94A3B8;">Estimasi Kebutuhan Material (BoQ)</div>
+            <div style="font-size:1.25rem; font-weight:800; color:#38BDF8;">{boq['total_rebar_weight_kg']:.1f} kg Besi</div>
+            <div style="font-size:0.82rem; color:#CBD5E1; margin-top:4px;">
+                Volume Beton Cor: <strong>{boq['vol_concrete_m3']:.2f} m³</strong><br>
+                Total Panjang Baja: <strong>{boq['total_rebar_len_m']:.1f} m</strong><br>
+                Indeks Pembesian: <strong>{boq['steel_ratio_kg_m3']:.1f} kg/m³</strong>
+            </div>
+        </div>
+        """)
+
     with st.expander("📖 Rincian Rumus Matematis & Penjabaran 4 Metode Daya Dukung"):
         st.markdown(r"""
         #### 1. Persamaan Umum Kapasitas Dukung Tiga Suku:
@@ -521,12 +637,37 @@ with col_right:
     
     sk_col1, sk_col2 = st.columns([1.7, 0.9])
     with sk_col1:
-        tab_3d, tab_plan, tab_cross, tab_bulb = st.tabs([
-            "🕹️ Model 3D Interaktif (Putar 360°)",
+        tab_cutaway, tab_3d, tab_plan, tab_cross, tab_bulb = st.tabs([
+            "🌟 Model 3D Cutaway (Fondasi, Tulangan & Tanah)",
+            "🕹️ Model 3D Blok Dasar",
             "📐 Gambar Kerja 2D (Tampak Atas & Tulangan)",
             "🏗️ Potongan Melintang Geoteknik 2D",
             "🌊 Kontur Isobar Tegangan Boussinesq"
         ])
+
+        with tab_cutaway:
+            st.caption("💡 **Model 3D Cutaway Realistis (Sesuai Referensi Konstruksi):** Memotong penampang fondasi dan tanah sekitarnya untuk menampilkan jaring tulangan X & Y, kait 90°, dowel kolom, dan sengkang dalam satu tampilan 3D interaktif 360°.")
+            fig_cutaway = plot_cutaway_foundation_3d(
+                shape=bentuk_fondasi,
+                B=lebar_b,
+                L=panjang_l,
+                Df=df_in,
+                dw=dw_in,
+                P_kN=total_beban_aksial_p,
+                hf=hf,
+                col_b=col_b_val,
+                col_h=col_h_val,
+                cover_m=cover_val / 1000.0,
+                bar_dia_mm=bar_dia_val,
+                nx_bars=reinf_results["flexure_rebar"]["dir_x"]["n_bars"],
+                ny_bars=reinf_results["flexure_rebar"]["dir_y"]["n_bars"],
+                reinf_results=reinf_results,
+                soil_name=soil.get("soil_type", "Tanah Dasar"),
+                show_soil=True,
+                show_rebar=True,
+                show_cutaway=True
+            )
+            st.plotly_chart(fig_cutaway, use_container_width=True)
         
         with tab_3d:
             st.caption("💡 **Interaksi 3D:** Gunakan mouse / layar sentuh untuk **memutar sudut pandang (orbit 360°)**, zoom in/out, atau menggeser posisi.")
@@ -651,10 +792,13 @@ with col_right:
             "dead_load_unit": dl_val,
             "live_load_unit": ll_val,
             "p_column": total_beban_aksial_p,
-            "pu_column": pu_terfaktor
+            "pu_column": pu_terfaktor,
+            "Mux": mux_val,
+            "Muy": muy_val
         },
         comp_results=table_comp,
-        selected_dim={"B": lebar_b, "L": panjang_l, "Df": df_in, "SF": sf_in, "shape": bentuk_fondasi}
+        selected_dim={"B": lebar_b, "L": panjang_l, "Df": df_in, "hf": hf, "SF": sf_in, "shape": bentuk_fondasi},
+        reinf_results=reinf_results
     )
     
     csv_str = generate_csv_report(
@@ -664,9 +808,9 @@ with col_right:
     
     with exp_col1:
         st.download_button(
-            label="📊 Unduh Excel Komparasi 4 Metode (.xlsx)",
+            label="📊 Unduh Laporan Perhitungan Struktur 6-Sheets (.xlsx)",
             data=excel_bytes,
-            file_name=f"Laporan_Pondasi_Tapak_Cerdas_{st.session_state.project_info['name'].replace(' ', '_')}.xlsx",
+            file_name=f"Laporan_Perhitungan_Fondasi_{st.session_state.project_info['name'].replace(' ', '_')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             type="primary",
             use_container_width=True

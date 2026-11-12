@@ -758,3 +758,295 @@ def plot_soil_stratigraphy(layers, water_table=1.5):
     )
 
     return fig
+
+
+# =============================================================================
+# 6. MODEL 3D CUTAWAY PONDASI TELAPAK DENGAN DETAIL PENULANGAN & TANAH
+# =============================================================================
+
+def plot_cutaway_foundation_3d(
+    shape="Bujur Sangkar",
+    B=2.0,
+    L=2.0,
+    Df=1.5,
+    dw=1.5,
+    P_kN=350.0,
+    hf=0.45,
+    col_b=0.40,
+    col_h=0.40,
+    cover_m=0.075,
+    bar_dia_mm=16.0,
+    nx_bars=12,
+    ny_bars=12,
+    reinf_results=None,
+    soil_name="Tanah Lempung Sedang",
+    show_soil=True,
+    show_rebar=True,
+    show_cutaway=True
+):
+    """
+    Menghasilkan Model 3D Cutaway Realistis (Cross-Section Perspective)
+    sesuai referensi render teknik konstruksi:
+    - Fondasi beton 3D dengan potongan cross-section/cutaway quadrant
+    - Tulangan baja 3D lengkap di dalam fondasi (Tulangan arah X, arah Y, kait 90°, dowel kolom, sengkang)
+    - Lapisan tanah 3D bertingkat di sekitar fondasi dengan galian tapak terbuka
+    - Elevasi Muka Air Tanah (GWL), lantai kerja (lean concrete), dan kolom pedestal
+    - Kontrol interaktif 360 derajat (putar, zoom, pan, toggle layer)
+    """
+    fig = go.Figure()
+
+    z_bot = -Df
+    z_top = -Df + hf
+    z_col_top = 0.65  # Pedestal mencuat 0.65m di atas permukaan tanah
+    z_lean_bot = z_bot - 0.10  # Lantai kerja setebal 10 cm
+
+    db_m = bar_dia_mm / 1000.0
+    half_b = B / 2.0
+    half_l = L / 2.0
+    half_cb = col_b / 2.0
+    half_ch = col_h / 2.0
+
+    # 1. TANAH BERSTRATIGRAFI 3D DENGAN MODEL GALIAN CUTAWAY (SURROUNDING SOIL BLOCK)
+    if show_soil:
+        soil_w = max(4.0, B * 2.2)
+        soil_l = max(4.0, L * 2.2)
+        s_half_w = soil_w / 2.0
+        s_half_l = soil_l / 2.0
+        pit_margin = 0.40  # Lebar ruang kerja galian di sekitar fondasi
+
+        # Lapisan 1: Tanah Punggung / Permukaan (z = 0 s/d z = -Df/2)
+        z_s1_top = 0.0
+        z_s1_bot = -Df / 2.0
+        # Lapisan 2: Tanah Penumpu Fondasi (z = -Df/2 s/d z = -Df)
+        z_s2_top = z_s1_bot
+        z_s2_bot = z_bot
+        # Lapisan 3: Lapisan Tanah Bawah Dasar / Kerikil (z = -Df s/d z = -(Df + 1.2))
+        z_s3_top = z_bot
+        z_s3_bot = z_bot - 1.20
+
+        # Blok tanah samping (Dibuat mengelilingi lubang galian fondasi dengan cutaway kuadran depan)
+        # Sisi Belakang (+Y):
+        fig.add_trace(_make_box_mesh(
+            -s_half_w, s_half_w, half_l + pit_margin, s_half_l, z_s2_bot, z_s1_top,
+            color="#854D0E", opacity=0.80, name="Tanah Sisi Belakang (Lempung)"
+        ))
+        # Sisi Kanan (+X):
+        fig.add_trace(_make_box_mesh(
+            half_b + pit_margin, s_half_w, -s_half_l, half_l + pit_margin, z_s2_bot, z_s1_top,
+            color="#A16207", opacity=0.80, name="Tanah Sisi Kanan"
+        ))
+        if not show_cutaway:
+            # Jika cutaway dinonaktifkan, tutup sisi depan dan kiri
+            fig.add_trace(_make_box_mesh(
+                -s_half_w, s_half_w, -s_half_l, -(half_l + pit_margin), z_s2_bot, z_s1_top,
+                color="#854D0E", opacity=0.80, name="Tanah Sisi Depan"
+            ))
+            fig.add_trace(_make_box_mesh(
+                -s_half_w, -(half_b + pit_margin), -(half_l + pit_margin), half_l + pit_margin, z_s2_bot, z_s1_top,
+                color="#A16207", opacity=0.80, name="Tanah Sisi Kiri"
+            ))
+
+        # Lapisan Tanah Dasar Bawah Fondasi (Gravel / Subgrade Bed)
+        fig.add_trace(_make_box_mesh(
+            -s_half_w, s_half_w, -s_half_l, s_half_l, z_s3_bot, z_s3_top,
+            color="#475569", opacity=0.88, name="Tanah Dasar Keras / Kerikil Padat"
+        ))
+
+        # Lantai Kerja Beton Kurus (Lean Concrete / Blinding t = 10 cm)
+        fig.add_trace(_make_box_mesh(
+            -half_b - 0.10, half_b + 0.10, -half_l - 0.10, half_l + 0.10, z_lean_bot, z_bot,
+            color="#94A3B8", opacity=0.85, name="Lantai Kerja Beton (t = 10 cm)"
+        ))
+
+    # 2. BIDANG MUKA AIR TANAH 3D (GWL)
+    if dw is not None and dw <= (Df + 1.2):
+        z_gw = -float(dw)
+        gw_span = max(3.5, max(B, L) * 1.5)
+        fig.add_trace(go.Mesh3d(
+            x=[-gw_span, gw_span, gw_span, -gw_span],
+            y=[-gw_span, -gw_span, gw_span, gw_span],
+            z=[z_gw, z_gw, z_gw, z_gw],
+            i=[0, 0], j=[1, 2], k=[2, 3],
+            color="#0284C7", opacity=0.28,
+            name=f"Muka Air Tanah (MAT = -{dw:.2f} m)"
+        ))
+
+    # 3. BADAN BETON FONDASI (CONCRETE SLAB & PEDESTAL)
+    # Jika mode cutaway aktif, pelat fondasi dibuat transparan frosted-concrete
+    # sehingga geometri 3D beton tampak jelas sekaligus jaring tulangan di dalamnya terlihat 100%!
+    concrete_opacity = 0.45 if show_cutaway else 0.92
+
+    if "Lingkaran" in shape:
+        r_circ = half_b
+        fig.add_trace(_make_cylinder_mesh(
+            r=r_circ, z0=z_bot, z1=z_top,
+            color="#CBD5E1", opacity=concrete_opacity,
+            name=f"Pelat Fondasi Lingkaran (Ø = {B:.2f}m, h = {hf:.2f}m)"
+        ))
+        # Pedestal Bulat
+        fig.add_trace(_make_cylinder_mesh(
+            r=min(0.25, r_circ * 0.4), z0=z_top, z1=z_col_top,
+            color="#E2E8F0", opacity=0.90, name="Pedestal Bulat"
+        ))
+    else:
+        # Bujur Sangkar / Persegi Panjang
+        fig.add_trace(_make_box_mesh(
+            -half_b, half_b, -half_l, half_l, z_bot, z_top,
+            color="#CBD5E1", opacity=concrete_opacity,
+            name=f"Pelat Fondasi Beton ({B:.2f} x {L:.2f} m, hf = {hf:.2f} m)"
+        ))
+        # Kolom Pedestal Beton di atas pelat fondasi
+        fig.add_trace(_make_box_mesh(
+            -half_cb, half_cb, -half_ch, half_ch, z_top, z_col_top,
+            color="#E2E8F0", opacity=0.92,
+            name=f"Pedestal Kolom ({col_b:.2f} x {col_h:.2f} m)"
+        ))
+
+    # 4. KERANGKA TULANGAN BAJA 3D DI DALAM FONDASI (REBAR CAGE INTERIOR)
+    if show_rebar:
+        hook_h = min(0.20, max(0.10, hf - 2.0 * cover_m))
+
+        # A. TULANGAN BAWAH ARAH X (Running parallel to X axis)
+        z_rebar_x = z_bot + cover_m + db_m / 2.0
+        x_start = -half_b + cover_m
+        x_end = half_b - cover_m
+
+        if ny_bars > 1:
+            y_positions = list(np.linspace(-half_l + cover_m, half_l - cover_m, ny_bars))
+        else:
+            y_positions = [0.0]
+
+        for idx_y, y_pos in enumerate(y_positions):
+            # Batang utama X dengan kait 90 derajat ke atas di kedua ujung
+            rx_x = [x_start, x_start, x_end, x_end]
+            rx_y = [y_pos, y_pos, y_pos, y_pos]
+            rx_z = [z_rebar_x + hook_h, z_rebar_x, z_rebar_x, z_rebar_x + hook_h]
+
+            fig.add_trace(go.Scatter3d(
+                x=rx_x, y=rx_y, z=rx_z,
+                mode="lines",
+                line=dict(color="#00E5FF", width=5.5),
+                name=f"Tulangan Utama Arah X (D{int(bar_dia_mm)})",
+                showlegend=(idx_y == 0),
+                hoverinfo="text",
+                hovertext=f"Tulangan Bawah Arah X: D{int(bar_dia_mm)} @ elevasi {z_rebar_x:.3f}m"
+            ))
+
+        # B. TULANGAN BAWAH ARAH Y (Running parallel to Y axis)
+        z_rebar_y = z_bot + cover_m + db_m + db_m / 2.0
+        y_start = -half_l + cover_m
+        y_end = half_l - cover_m
+
+        if nx_bars > 1:
+            x_positions = list(np.linspace(-half_b + cover_m, half_b - cover_m, nx_bars))
+        else:
+            x_positions = [0.0]
+
+        for idx_x, x_pos in enumerate(x_positions):
+            # Batang utama Y dengan kait 90 derajat ke atas di kedua ujung
+            ry_x = [x_pos, x_pos, x_pos, x_pos]
+            ry_y = [y_start, y_start, y_end, y_end]
+            ry_z = [z_rebar_y + hook_h, z_rebar_y, z_rebar_y, z_rebar_y + hook_h]
+
+            fig.add_trace(go.Scatter3d(
+                x=ry_x, y=ry_y, z=ry_z,
+                mode="lines",
+                line=dict(color="#F59E0B", width=5.5),
+                name=f"Tulangan Utama Arah Y (D{int(bar_dia_mm)})",
+                showlegend=(idx_x == 0),
+                hoverinfo="text",
+                hovertext=f"Tulangan Bawah Arah Y: D{int(bar_dia_mm)} @ elevasi {z_rebar_y:.3f}m"
+            ))
+
+        # C. TULANGAN DOWEL KOLOM / STARTER BARS (Vertical Column Dowels)
+        # 4 batang tulangan sudut kolom mencuat ke atas
+        dowel_cover = 0.040  # 40 mm selimut kolom
+        dc_x = half_cb - dowel_cover
+        dc_y = half_ch - dowel_cover
+        dowel_corners = [(-dc_x, -dc_y), (dc_x, -dc_y), (dc_x, dc_y), (-dc_x, dc_y)]
+
+        z_dowel_bot = z_bot + cover_m + 0.03
+        z_dowel_top = z_col_top + 0.40  # Mencuat untuk sambungan kolom atas
+
+        for idx_d, (dx_pos, dy_pos) in enumerate(dowel_corners):
+            # Kaki dowel berbelok 90 derajat di dasar fondasi
+            foot_len = 0.25
+            foot_dir_x = foot_len if dx_pos >= 0 else -foot_len
+
+            fig.add_trace(go.Scatter3d(
+                x=[dx_pos + foot_dir_x, dx_pos, dx_pos],
+                y=[dy_pos, dy_pos, dy_pos],
+                z=[z_dowel_bot, z_dowel_bot, z_dowel_top],
+                mode="lines",
+                line=dict(color="#10B981", width=7),
+                name="Tulangan Dowel Kolom",
+                showlegend=(idx_d == 0),
+                hoverinfo="text",
+                hovertext="Tulangan Dowel Kolom (Starter Rebars)"
+            ))
+
+        # D. SENGKANG / BEGEL PEDESTAL (Column Ties / Stirrups)
+        tie_elevations = list(np.linspace(z_top + 0.08, z_col_top + 0.30, 4))
+        for idx_t, z_tie in enumerate(tie_elevations):
+            tie_x = [-dc_x, dc_x, dc_x, -dc_x, -dc_x]
+            tie_y = [-dc_y, -dc_y, dc_y, dc_y, -dc_y]
+            tie_z = [z_tie, z_tie, z_tie, z_tie, z_tie]
+
+            fig.add_trace(go.Scatter3d(
+                x=tie_x, y=tie_y, z=tie_z,
+                mode="lines",
+                line=dict(color="#EF4444", width=4),
+                name="Sengkang / Begel Kolom",
+                showlegend=(idx_t == 0),
+                hoverinfo="text",
+                hovertext=f"Sengkang Pedestal Ø10 @ elevasi {z_tie:.2f}m"
+            ))
+
+    # 5. PANAH VEKTOR BEBAN AKSIAL PU
+    p_arrow_top = z_col_top + 0.70
+    fig.add_trace(go.Scatter3d(
+        x=[0, 0], y=[0, 0], z=[p_arrow_top, z_col_top + 0.40],
+        mode="lines+markers",
+        line=dict(color="#FBBF24", width=9),
+        marker=dict(size=[0, 11], color="#FBBF24", symbol="diamond"),
+        name=f"Beban Aksial P = {P_kN:.1f} kN",
+        hovertext=[f"P = {P_kN:.1f} kN (~{P_kN/9.81:.1f} Ton)", "Muka Atas Kolom"]
+    ))
+
+    # 6. ANOTASI DIMENSI & SELIMUT BETON
+    fig.add_trace(go.Scatter3d(
+        x=[half_b + 0.15], y=[0], z=[z_bot + hf / 2.0],
+        mode="text",
+        text=[f"hf = {hf*100:.0f} cm"],
+        textposition="middle right",
+        textfont=dict(color="#38BDF8", size=11, family="Plus Jakarta Sans"),
+        showlegend=False
+    ))
+
+    # Layout 3D Styling (Dark Slate Blueprint)
+    fig.update_layout(
+        title=dict(
+            text=f"<b>🏛️ Model 3D Cutaway Fondasi Telapak & Detail Penulangan (B = {B:.2f}m, L = {L:.2f}m, hf = {hf:.2f}m)</b>",
+            font=dict(size=14, color="#F8FAFC", family="Plus Jakarta Sans")
+        ),
+        scene=dict(
+            xaxis=dict(title="Sumbu X (m)", backgroundcolor="#081122", gridcolor="#1E293B", showbackground=True, color="#94A3B8"),
+            yaxis=dict(title="Sumbu Y (m)", backgroundcolor="#081122", gridcolor="#1E293B", showbackground=True, color="#94A3B8"),
+            zaxis=dict(title="Elevasi Z (m)", backgroundcolor="#081122", gridcolor="#1E293B", showbackground=True, color="#94A3B8"),
+            aspectratio=dict(x=1.1, y=1.1, z=1.0),
+            camera=dict(
+                eye=dict(x=1.75, y=-1.85, z=1.25)
+            )
+        ),
+        paper_bgcolor="rgba(15, 23, 42, 0.95)",
+        margin=dict(l=10, r=10, t=45, b=10),
+        height=560,
+        showlegend=True,
+        legend=dict(
+            font=dict(color="#CBD5E1", size=10),
+            bgcolor="rgba(15, 23, 42, 0.8)",
+            bordercolor="#334155"
+        )
+    )
+
+    return fig
