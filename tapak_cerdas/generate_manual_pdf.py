@@ -459,9 +459,9 @@ def build_manual_pdf(output_pdf_path):
         body
     ))
 
-    story.append(Paragraph("6.1 Komponen Model 3D Cutaway", h2))
+    story.append(Paragraph("6.1 Komponen Model 3D Cutaway Realistis", h2))
     story.append(Paragraph("1. <b>Pelat Beton Tapak dengan Irisan Cutaway:</b> Sebagian badan beton ditampilkan terbuka sehingga detail jaring tulangan baja di bagian dalam dapat terlihat jelas dari berbagai sudut pandang.", bullet))
-    story.append(Paragraph("2. <b>Jaring Tulangan Bawah Arah X & Y:</b> Batang tulangan baja silinder 3D berwarna abu-abu baja gelap dengan spasi proporsional dan ujung kait standar 90 derajat mengarah ke atas.", bullet))
+    story.append(Paragraph("2. <b>Keranjang Kotak Pembesian (3D Rebar Box Cage):</b> Sesuai standar konstruksi footplate modern, pembesian terdiri dari <b>jaring tulangan bawah</b> (kait membengkok ke atas), <b>jaring tulangan atas</b> (kait membengkok ke bawah), serta <b>sabuk begel keliling dan sengkang vertikal tepi</b> yang saling mengikat membentuk sangkar/kotak pembesian 3D kokoh.", bullet))
     story.append(Paragraph("3. <b>Kolom Pedestal & Stek Tulangan Kolom (Starter Dowels):</b> Penampang kolom di atas tapak dilengkapi tulangan longitudinal kolom yang menjulur ke atas serta begel (sengkang pengikat) horizontal.", bullet))
     story.append(Paragraph("4. <b>Lapisan Lantai Kerja (Lean Concrete Blinding):</b> Lapisan beton kurus setebal 100 mm dan dasar pasir urug padat di bawah dasar telapak fondasi.", bullet))
     story.append(Paragraph("5. <b>Lubang Galian Tanah & Stratigrafi Berlapis:</b> Dinding lubang galian memperlihatkan susunan strata tanah asli bergradasi warna litologi (tanah urug, lempung, pasir berlempung, dan kerikil).", bullet))
@@ -534,6 +534,20 @@ def build_manual_pdf(output_pdf_path):
         ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor("#F8FAFC")]),
     ]))
     story.append(t_s_found)
+    story.append(Spacer(1, 4 * mm))
+
+    story.append(Paragraph("7.3 Sistem Ekspor Gambar Kerja AutoCAD (.dxf dalam Satuan Milimeter)", h2))
+    story.append(Paragraph(
+        "Aplikasi menyediakan fitur ekspor gambar CAD berstandar konsultan perencana melalui tombol "
+        "<b>'Unduh Gambar AutoCAD (.dxf)'</b>. File gambar kerja dihasilkan secara native dengan satuan <b>milimeter (mm)</b> "
+        "dan dapat langsung dibuka di AutoCAD, Civil 3D, ZwCAD, maupun BricsCAD tanpa konversi skala:",
+        body
+    ))
+    story.append(Paragraph("1. <b>Tampak Atas (Plan View):</b> Garis luar pelat fondasi (B x L mm), kolom pedestal (bc x hc mm), jaring tulangan bawah (cyan), dan jaring tulangan atas kotak (merah) lengkap dengan garis dimensi dan notasi diameter/spasi.", bullet))
+    story.append(Paragraph("2. <b>Tampak Samping (Elevation View):</b> Elevasi muka tanah asli (EL ±0.00), kemiringan lereng galian tapak (slope 1:0.5), posisi pelat pada dasar galian (Df), muka air tanah (GWL), dan kolom menembus permukaan tanah.", bullet))
+    story.append(Paragraph("3. <b>Potongan Melintang (Cross-Section):</b> Detail irisan vertikal memperlihatkan selimut beton 75 mm, jaring tulangan bawah dengan kait 90° ke atas, tulangan atas dengan kait membengkok ke bawah, stek dowel kolom, dan sengkang pedestal.", bullet))
+    story.append(Paragraph("4. <b>Model 3D Isometrik CAD (3D Wireframe / 3DFace):</b> Geometri 3 dimensi fondasi dan sangkar pembesian utuh yang dapat diputar 360 derajat di AutoCAD menggunakan perintah <code>3DORBIT</code> atau ViewCube.", bullet))
+    story.append(Paragraph("5. <b>Kop Gambar Resmi Konsultan (Title Block):</b> Lembar gambar dilengkapi etiket kop resmi (Nomor Lembar STR-01, Identitas Proyek, Nama Perencana, Tanggal, Skala 1:20, dan Acuan SNI).", bullet))
 
     story.append(Spacer(1, 4 * mm))
 

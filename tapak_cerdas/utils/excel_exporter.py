@@ -10,12 +10,12 @@ Deskripsi: Generator laporan Excel resmi konsultan rekayasa geoteknik dan strukt
               - Sheet 3: CPT Log (SNI 2827:2008, qc, fs, Rf, Chart)
               - Sheet 4: Soil Profile (Visual Stratigraphy & Properties)
               - Sheet 5: Summary & Recommendations
-           2. Foundation Calculation Report (6 Sheets dengan RUMUS AKTIF EXCEL):
+           2. Foundation Calculation Report (6 Sheets dengan Rangkaian Perhitungan Runtut):
               - Sheet 1: Design Criteria (Beban SNI 1727:2020, Material SNI 2847:2019)
               - Sheet 2: Soil Parameter (Stratigrafi & Korelasi Lapangan)
-              - Sheet 3: Foundation Dimension Calculation (Daya Dukung 4 Metode, Tegangan Kontak, Eksentrisitas)
+              - Sheet 3: Foundation Dimension Calculation (Daya Dukung, Tegangan Kontak, Eksentrisitas)
               - Sheet 4: Structural Calculation (Momen Mu, Geser 1 Arah, Geser Pons 2 Arah)
-              - Sheet 5: Reinforcement Calculation (As req, As min, Spasi Tulangan, Detailing, Berat Baja)
+              - Sheet 5: Reinforcement Calculation (As req, Spasi Tulangan, Keranjang Kotak, BoQ)
               - Sheet 6: Final Design Summary & Bill of Quantities
 =============================================================================
 """
@@ -26,7 +26,14 @@ import pandas as pd
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-from openpyxl.chart import LineChart, BarChart, Reference
+from openpyxl.chart import LineChart, Reference
+
+try:
+    import streamlit as st
+    cache_decorator = st.cache_data(show_spinner=False)
+except Exception:
+    def cache_decorator(func):
+        return func
 
 
 def _clean_num(val):
@@ -47,22 +54,24 @@ def _style_header_cell(cell, fill_color="1E3A8A", text_color="FFFFFF", bold=True
 
 
 def _style_border(cell, border_style="thin", border_color="CBD5E1"):
-    side = Side(style=border_style, color=border_color)
-    cell.border = Border(left=side, right=side, top=side, bottom=side)
+    cell.border = Border(
+        left=Side(style=border_style, color=border_color),
+        right=Side(style=border_style, color=border_color),
+        top=Side(style=border_style, color=border_color),
+        bottom=Side(style=border_style, color=border_color)
+    )
 
 
 def _setup_page_print(ws, landscape=False):
     ws.page_setup.paperSize = ws.PAPERSIZE_A4
     ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE if landscape else ws.ORIENTATION_PORTRAIT
-    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.page_setup.fitToPage = True
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 0
-    try:
-        ws.oddHeader.left.text = "TAPAK CERDAS - Dokumen Perencanaan Resmi"
-        ws.oddFooter.left.text = "Acuan: SNI 1727:2020 & SNI 2847:2019"
-        ws.oddFooter.right.text = "Halaman &P dari &N"
-    except Exception:
-        pass
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.oddHeader.left.text = "&B TAPAK CERDAS &B - Geotechnical & Structural Design Report"
+    ws.oddFooter.right.text = "Halaman &P dari &N"
+    ws.oddFooter.left.text = "Format Standar SNI 1727:2020 / SNI 2847:2019 / SNI 8460:2017"
 
 
 # =============================================================================
@@ -73,14 +82,15 @@ def generate_soil_investigation_report(project_info, spt_layers=None, cpt_points
     """
     Menghasilkan Laporan Penyelidikan Tanah Resmi (Soil Investigation Report) 5 Sheets:
     - Sheet 1: General Information
-    - Sheet 2: Boring Log / SPT (Sesuai Referensi Gambar 3)
+    - Sheet 2: Boring Log / SPT (Sesuai Referensi Gambar Boring Log)
     - Sheet 3: CPT Log (Sesuai Standar SNI 2827:2008)
     - Sheet 4: Soil Profile (Visual Stratigrafi Lapisan Tanah)
     - Sheet 5: Summary (Rangkuman Geoteknik & Rekomendasi)
     """
     wb = openpyxl.Workbook()
+    wb.calculation.fullCalcOnLoad = True
+    wb.calculation.calcMode = 'auto'
 
-    # Styling Palet Geoteknik Profesional
     font_main_title = Font(name="Calibri", size=15, bold=True, color="1E3A8A")
     font_sub_title = Font(name="Calibri", size=9, italic=True, color="64748B")
     font_section = Font(name="Calibri", size=11, bold=True, color="0F172A")
@@ -110,7 +120,7 @@ def generate_soil_investigation_report(project_info, spt_layers=None, cpt_points
     p_loc = project_info.get("location", "Semarang")
     p_client = project_info.get("client", "Pemilik Proyek / Pengembang")
     p_bh = project_info.get("borehole_id", "BH-01")
-    p_gwl = _clean_num(project_info.get("water_table_depth", 1.50))
+    p_gwl = _clean_num(project_info.get("water_table_depth", project_info.get("water_table", 1.50)))
     p_date = project_info.get("date", "2026-11-12")
     p_engineer = project_info.get("engineer", "Insinyur Geoteknik / Perencana")
     p_consultant = project_info.get("consultant", "Laboratorium Mekanika Tanah & Geoteknik")
@@ -131,6 +141,8 @@ def generate_soil_investigation_report(project_info, spt_layers=None, cpt_points
     ws1["A4"] = "1. IDENTITAS PROYEK & PENYELIDIKAN TANAH"
     ws1["A4"].font = font_section
 
+    total_depth = max([l.get('depth_bot', 12.0) for l in spt_layers] if spt_layers else [12.0])
+
     gen_info_table = [
         ("Nama Proyek", p_name),
         ("Lokasi Proyek", p_loc),
@@ -140,7 +152,7 @@ def generate_soil_investigation_report(project_info, spt_layers=None, cpt_points
         ("Koordinat Titik (Y / Lintang)", project_info.get("coord_y", "-7.0512° S")),
         ("Tanggal Pengujian", p_date),
         ("Elevasi Permukaan Tanah (GL)", "+0.00 m (Muka Tanah Asli)"),
-        ("Kedalaman Total Penyelidikan", f"{max([l.get('depth_bot', 12.0) for l in spt_layers] if spt_layers else [12.0]):.2f} meter"),
+        ("Kedalaman Total Penyelidikan", f"{total_depth:.2f} meter"),
         ("Jenis Pengujian Dilaksanakan", "Boring Mesin, Uji Penetrasi Standar (SPT ASTM D1586) & Sondir Bikonus 2.5 Ton (SNI 2827:2008)"),
         ("Instansi / Konsultan Geoteknik", p_consultant),
         ("Insinyur Penanggung Jawab", p_engineer)
@@ -159,94 +171,89 @@ def generate_soil_investigation_report(project_info, spt_layers=None, cpt_points
         r += 1
 
     r += 1
-    ws1[f"A{r}"] = "2. STANDAR ACUAN PENGUJIAN"
+    ws1[f"A{r}"] = "2. METODE & STANDAR ACUAN PENGUJIAN"
     ws1[f"A{r}"].font = font_section
     r += 1
-    standards_list = [
-        "1. ASTM D1586 - Standard Test Method for Standard Penetration Test (SPT) and Split-Barrel Sampling of Soils.",
-        "2. SNI 2827:2008 - Cara Uji Penetrasi Lapangan dengan Alat Sondir (CPT).",
-        "3. SNI 8460:2017 - Persyaratan Perancangan Geoteknik.",
-        "4. ASTM D2487 - Standard Practice for Classification of Soils for Engineering Purposes (Unified Soil Classification System / USCS)."
+
+    methods = [
+        ("Uji Penetrasi Standar (SPT)", "ASTM D1586 / SNI 4153:2008", "Hammer 63.5 kg, Tinggi jatuh 76 cm, Split spoon sampler"),
+        ("Uji Penetrasi Konus (CPT)", "SNI 2827:2008 / ASTM D3441", "Bikonus Begemann luas konus 10 cm², sudut apex 60°, kapasitas 2.5 ton"),
+        ("Pengambilan Sampel Tanah (UDS)", "ASTM D1587", "Thin-walled tube (Shelby tube) untuk sampel lempung tak terganggu"),
+        ("Klasifikasi Tanah Sistem Unifikasi", "ASTM D2487 (USCS)", "Klasifikasi berdasarkan gradasi butiran dan plastisitas Atterberg")
     ]
-    for s_txt in standards_list:
-        ws1[f"A{r}"] = s_txt
-        ws1[f"A{r}"].font = font_reg
+
+    for m_title, m_std, m_desc in methods:
+        ws1[f"A{r}"] = m_title
+        ws1[f"A{r}"].font = font_bold
+        ws1[f"A{r}"].border = thin_border
+        ws1[f"B{r}"] = f"{m_std} — {m_desc}"
+        ws1[f"B{r}"].font = font_reg
+        ws1[f"B{r}"].border = thin_border
         r += 1
 
-    r += 1
-    ws1[f"A{r}"] = "3. LEMBAR PENGESAHAN DOKUMEN"
-    ws1[f"A{r}"].font = font_section
-    r += 1
-    sign_headers = ["Disiapkan Oleh (Surveyor)", "Diperiksa Oleh (Geotechnical Eng.)", "Disetujui Oleh (Chief Engineer)"]
-    for c_i, sh in enumerate(sign_headers, 1):
-        c_letter = get_column_letter(c_i)
-        ws1[f"{c_letter}{r}"] = sh
-        _style_header_cell(ws1[f"{c_letter}{r}"], fill_color="1E3A8A", text_color="FFFFFF", bold=True, size=9)
-        ws1.row_dimensions[r+1].height = 40
-        ws1[f"{c_letter}{r+1}"].border = thin_border
-        ws1[f"{c_letter}{r+2}"] = f"Nama: {p_engineer}" if c_i == 1 else "Nama: Ir. Geoteknik, MT" if c_i == 2 else "Nama: Dr. Ir. Pondasi, IPM"
-        ws1[f"{c_letter}{r+2}"].font = font_reg
-        ws1[f"{c_letter}{r+2}"].border = thin_border
-
     ws1.column_dimensions["A"].width = 30
-    ws1.column_dimensions["B"].width = 65
-    ws1.column_dimensions["C"].width = 35
+    ws1.column_dimensions["B"].width = 75
 
     # -------------------------------------------------------------------------
-    # SHEET 2: BORING LOG / SPT (PERSIS REFERENSI GAMBAR 3)
+    # SHEET 2: BORING LOG / SPT
     # -------------------------------------------------------------------------
     ws2 = wb.create_sheet(title="Boring Log - SPT")
     ws2.views.sheetView[0].showGridLines = True
     _setup_page_print(ws2, landscape=True)
 
-    ws2["A1"] = "BORE LOG"
-    ws2["A1"].font = Font(name="Calibri", size=16, bold=True, color="000000")
-    ws2["A1"].alignment = align_center
-    ws2.merge_cells("A1:N1")
+    ws2["A1"] = f"BORE HOLE LOG & STANDARD PENETRATION TEST (SPT) — {p_bh}"
+    ws2["A1"].font = font_main_title
+    ws2["A2"] = f"Proyek: {p_name} | Lokasi: {p_loc} | MAT: -{p_gwl:.2f} m"
+    ws2["A2"].font = font_sub_title
 
-    # Header Proyek Boring Log Sesuai Referensi Gambar 3
-    ws2["A2"] = f"BH No: {p_bh}"
-    ws2["A2"].font = font_bold
-    ws2["A3"] = f"Project: {p_name}"
-    ws2["A3"].font = font_reg
-
-    ws2["I2"] = f"Date of Commencement: {p_date}"
-    ws2["I2"].font = font_reg
-    ws2["I3"] = f"Ground Water Table: ∇ {p_gwl:.2f} m"
-    ws2["I3"].font = font_bold
-
-    headers_bolog = [
-        "Depth Below GL (m)", "Soil Description", "Thickness of Strata (m)", "Legend / Symbol",
-        "Sample Type", "Sampling Depth (m)", "Blows N1 (0-15cm)", "Blows N2 (15-30cm)", "Blows N3 (30-45cm)",
-        "SPT N-Value (N2+N3)", "Consistency / Density", "cu (kPa)", "φ' (°)", "γ (kN/m³)"
+    headers_spt_1 = [
+        "Kedalaman (m)", "Deskripsi Visual Litologi Tanah", "Tebal (m)", "Simbol USCS",
+        "Jenis Sampel", "Elevasi (m)", "Penetrasi Pukulan (Pukulan / 15 cm)", "", "",
+        "Nilai N-SPT", "Konsistensi Tanah", "Kuat Geser cu (kPa)", "Sudut Geser φ' (°)", "Berat Isi γ (kN/m³)"
+    ]
+    headers_spt_2 = [
+        "", "", "", "", "", "", "N1 (0-15cm)", "N2 (15-30cm)", "N3 (30-45cm)",
+        "N = N2 + N3", "", "", "", ""
     ]
 
-    start_row = 5
-    for c_i, h in enumerate(headers_bolog, 1):
-        cell = ws2.cell(row=start_row, column=c_i, value=h)
-        _style_header_cell(cell, fill_color="0F172A", text_color="FFFFFF", bold=True, size=9)
+    for c_i, h in enumerate(headers_spt_1, 1):
+        cell = ws2.cell(row=4, column=c_i, value=h)
+        _style_header_cell(cell, fill_color="1E3A8A", text_color="FFFFFF", bold=True, size=9)
         _style_border(cell)
 
+    for c_i, h in enumerate(headers_spt_2, 1):
+        cell = ws2.cell(row=5, column=c_i, value=h)
+        if h != "":
+            _style_header_cell(cell, fill_color="DBEAFE", text_color="0F172A", bold=True, size=8.5)
+        else:
+            cell.fill = fill_head_navy
+        _style_border(cell)
+
+    # Merge header
+    merge_ranges = ["A4:A5", "B4:B5", "C4:C5", "D4:D5", "E4:E5", "F4:F5", "G4:I4", "J4:J5", "K4:K5", "L4:L5", "M4:M5", "N4:N5"]
+    for m in merge_ranges:
+        ws2.merge_cells(m)
+
     if not spt_layers or len(spt_layers) == 0:
-        # Gunakan sample data borelog jika kosong
         spt_layers = [
-            {"depth_top": 0.0, "depth_bot": 2.0, "thickness": 2.0, "n1": 1, "n2": 1, "n3": 1, "n_spt": 2, "soil_type": "Filled Up Soil (Tanah Urug)", "deskripsi": "Filled up soil, loose, brownish dark", "konsistensi": "Sangat Lunak", "cu": 15.0, "phi_eff": 20.0, "gamma": 16.0},
-            {"depth_top": 2.0, "depth_bot": 3.0, "thickness": 1.0, "n1": 9, "n2": 10, "n3": 9, "n_spt": 19, "soil_type": "Reddish / Grayish Clayey Sand", "deskripsi": "Reddish/grayish clayey sand, stiff", "konsistensi": "Kaku", "cu": 75.0, "phi_eff": 28.0, "gamma": 18.2},
-            {"depth_top": 3.0, "depth_bot": 6.0, "thickness": 3.0, "n1": 15, "n2": 18, "n3": 21, "n_spt": 39, "soil_type": "Greyish Silty Sand with Mica", "deskripsi": "Greyish silty sand with mica, very dense", "konsistensi": "Sangat Padat", "cu": 120.0, "phi_eff": 34.0, "gamma": 19.5},
-            {"depth_top": 6.0, "depth_bot": 10.5, "thickness": 4.5, "n1": 30, "n2": 45, "n3": 55, "n_spt": 100, "soil_type": "Weathered Rock / Bedrock", "deskripsi": "Weathered rock, hard layer, CR=76%, RQD=43%", "konsistensi": "Keras Membatu", "cu": 250.0, "phi_eff": 40.0, "gamma": 21.0}
+            {"depth_top": 0.0, "depth_bot": 1.5, "soil_type": "Lempung Lunak", "n1": 1, "n2": 2, "n3": 2, "n_spt": 4, "cu": 24.0, "phi_eff": 22.0, "gamma": 16.8, "deskripsi": "Lempung kelabu lunak, plastisitas tinggi"},
+            {"depth_top": 1.5, "depth_bot": 3.0, "soil_type": "Lempung Berlanau Sedang", "n1": 2, "n2": 3, "n3": 4, "n_spt": 7, "cu": 42.0, "phi_eff": 24.0, "gamma": 17.5, "deskripsi": "Lempung berlanau cokelat kekuningan, teguh"},
+            {"depth_top": 3.0, "depth_bot": 4.5, "soil_type": "Lanau Berpasir Kaku", "n1": 4, "n2": 7, "n3": 8, "n_spt": 15, "cu": 85.0, "phi_eff": 28.0, "gamma": 18.2, "deskripsi": "Lanau pasiran kelabu kaku"},
+            {"depth_top": 4.5, "depth_bot": 6.0, "soil_type": "Pasir Berlanau Padat", "n1": 8, "n2": 14, "n3": 17, "n_spt": 31, "cu": 10.0, "phi_eff": 35.0, "gamma": 19.5, "deskripsi": "Pasir sedang berlanau abu-abu sangat padat"}
         ]
 
+    start_row = 6
     for idx, lyr in enumerate(spt_layers, 1):
-        cur_r = start_row + idx
+        cur_r = start_row + idx - 1
         d_top = float(lyr.get("depth_top", 0.0))
         d_bot = float(lyr.get("depth_bot", d_top + 1.5))
         thick = round(d_bot - d_top, 2)
         n1 = int(lyr.get("n1", 1))
-        n2 = int(lyr.get("n2", 1))
-        n3 = int(lyr.get("n3", 1))
+        n2 = int(lyr.get("n2", 2))
+        n3 = int(lyr.get("n3", 2))
+        n_spt_val = int(lyr.get("n_spt", n2 + n3))
         samp_type = "SPT" if idx % 2 != 0 else "UDS"
 
-        # Simbol USCS Tanah
         stype = lyr.get("soil_type", "")
         if "Pasir" in stype:
             sym = "SM"
@@ -259,7 +266,6 @@ def generate_soil_investigation_report(project_info, spt_layers=None, cpt_points
         else:
             sym = "ML"
 
-        # Tulis rumus Excel aktif untuk N-SPT: =H{cur_r}+I{cur_r}
         row_data = [
             f"{d_top:.1f} - {d_bot:.1f}",
             lyr.get("deskripsi", lyr.get("soil_type", "Tanah")),
@@ -270,14 +276,13 @@ def generate_soil_investigation_report(project_info, spt_layers=None, cpt_points
             n1,
             n2,
             n3,
-            f"=H{cur_r}+I{cur_r}",  # RUMUS AKTIF EXCEL
+            n_spt_val,  # Nilai integer angka konkret - tidak akan kosong di Protected View!
             lyr.get("konsistensi", "-"),
             float(lyr.get("cu", lyr.get("c", 20.0))),
             float(lyr.get("phi_eff", lyr.get("phi", 24.0))),
             float(lyr.get("gamma", 17.5))
         ]
 
-        # Cek apakah lapisan ini memotong Muka Air Tanah (GWL)
         is_gw_layer = (d_top <= p_gwl <= d_bot)
         r_fill = fill_gwl if is_gw_layer else (fill_zebra if idx % 2 == 0 else fill_white)
 
@@ -286,17 +291,19 @@ def generate_soil_investigation_report(project_info, spt_layers=None, cpt_points
             cell.font = font_bold_center if c_i == 10 else font_reg
             cell.fill = r_fill
             cell.alignment = align_left if c_i == 2 else align_center
+            if c_i in [3, 6, 12, 13, 14]:
+                cell.number_format = '0.00' if c_i in [3, 6] else '0.0'
+            elif c_i in [7, 8, 9, 10]:
+                cell.number_format = '0'
             _style_border(cell)
 
-    end_spt_row = start_row + len(spt_layers)
+    end_spt_row = start_row + len(spt_layers) - 1
 
-    # Catatan Teknis Bore Log Bawah (Sesuai Referensi Gambar 3)
     ws2[f"A{end_spt_row + 2}"] = f"Bore hole Terminated at {spt_layers[-1].get('depth_bot', 10.5):.2f}m Below Ground Level."
     ws2[f"A{end_spt_row + 2}"].font = font_bold
-    ws2[f"A{end_spt_row + 3}"] = "Notes: SPT = Standard Penetration Test; UDS = Undisturbed Sample; GL = Ground Level; CR = Core Recovery; RQD = Rock Quality Designation."
+    ws2[f"A{end_spt_row + 3}"] = "Notes: SPT = Standard Penetration Test; UDS = Undisturbed Sample; GL = Ground Level; GWL = Ground Water Level."
     ws2[f"A{end_spt_row + 3}"].font = font_sub_title
 
-    # Tambahkan Grafik N-SPT vs Kedalaman (LineChart)
     try:
         chart_spt = LineChart()
         chart_spt.title = "GRAFIK PENETRASI N-SPT vs KEDALAMAN (m)"
@@ -306,15 +313,14 @@ def generate_soil_investigation_report(project_info, spt_layers=None, cpt_points
         chart_spt.width = 16
         chart_spt.height = 12
 
-        data_spt_ref = Reference(ws2, min_col=10, min_row=start_row, max_row=end_spt_row)
-        cats_spt_ref = Reference(ws2, min_col=1, min_row=start_row + 1, max_row=end_spt_row)
+        data_spt_ref = Reference(ws2, min_col=10, min_row=start_row - 1, max_row=end_spt_row)
+        cats_spt_ref = Reference(ws2, min_col=6, min_row=start_row, max_row=end_spt_row)
         chart_spt.add_data(data_spt_ref, titles_from_data=True)
         chart_spt.set_categories(cats_spt_ref)
         ws2.add_chart(chart_spt, "P4")
     except Exception:
         pass
 
-    # Lebar kolom otomatis
     for col in ws2.columns:
         if col[0].column > 14:
             continue
@@ -323,7 +329,7 @@ def generate_soil_investigation_report(project_info, spt_layers=None, cpt_points
     ws2.column_dimensions["B"].width = 34
 
     # -------------------------------------------------------------------------
-    # SHEET 3: CPT LOG (SNI 2827:2008 / ASTMD3441)
+    # SHEET 3: CPT LOG (SNI 2827:2008 / ASTM D3441)
     # -------------------------------------------------------------------------
     ws3 = wb.create_sheet(title="CPT Log")
     ws3.views.sheetView[0].showGridLines = True
@@ -359,28 +365,29 @@ def generate_soil_investigation_report(project_info, spt_layers=None, cpt_points
         cur_r = start_cpt_row + idx
         d_val = float(pt.get("depth", 0.0))
         qc_val = float(pt.get("qc", 10.0))
+        qc_kpa = round(qc_val * 98.07, 1)
         jh_val = float(pt.get("jh", qc_val + 5.0))
-        jhp_val = float(pt.get("jhp", pt.get("hp", 10.0)))
+        hp_val = round(max(0.0, jh_val - qc_val), 1)
+        jhp_val = float(pt.get("jhp", pt.get("hp", hp_val)))
+        fs_kg = round(hp_val / 10.0, 2)
+        fs_kpa = round(fs_kg * 98.07, 1)
+        rf_pct = round((fs_kg / qc_val) * 100.0, 2) if qc_val > 0 else 0.0
+        cu_val = round((qc_val * 98.07) / 16.0, 1)
+        phi_val = 24.0 if qc_val < 30 else round(min(42.0, 28.0 + (qc_val / 15.0)), 1)
 
-        # RUMUS AKTIF EXCEL DI SHEET CPT:
-        # qc (kPa) = C{cur_r} * 98.07
-        # HP = D{cur_r} - B{cur_r}
-        # fs (kg/cm2) = (D{cur_r} - B{cur_r}) / 10
-        # fs (kPa) = G{cur_r} * 98.07
-        # Rf (%) = (G{cur_r} / B{cur_r}) * 100
         cpt_row_data = [
             d_val,
             qc_val,
-            f"=B{cur_r}*98.07",
+            qc_kpa,
             jh_val,
-            f"=D{cur_r}-B{cur_r}",
+            hp_val,
             jhp_val,
-            f"=(D{cur_r}-B{cur_r})/10",
-            f"=G{cur_r}*98.07",
-            f"=IF(B{cur_r}>0, (G{cur_r}/B{cur_r})*100, 0)",
+            fs_kg,
+            fs_kpa,
+            rf_pct,
             pt.get("soil_type", "Lempung"),
-            round((qc_val * 98.07) / 16.0, 1),
-            24.0 if qc_val < 30 else 32.0
+            cu_val,
+            phi_val
         ]
 
         r_fill = fill_zebra if idx % 2 == 0 else fill_white
@@ -389,11 +396,14 @@ def generate_soil_investigation_report(project_info, spt_layers=None, cpt_points
             cell.font = font_bold_center if c_i in [2, 7, 9] else font_reg
             cell.fill = r_fill
             cell.alignment = align_left if c_i == 10 else align_center
+            if c_i in [1, 2, 3, 4, 5, 6, 8, 11, 12]:
+                cell.number_format = '0.0' if c_i != 1 else '0.00'
+            elif c_i in [7, 9]:
+                cell.number_format = '0.00'
             _style_border(cell)
 
     end_cpt_row = start_cpt_row + len(cpt_points)
 
-    # Tambahkan Grafik CPT qc vs Kedalaman
     try:
         chart_cpt = LineChart()
         chart_cpt.title = "GRAFIK PERLAWANAN KONUS qc & JHP vs KEDALAMAN (m)"
@@ -447,8 +457,6 @@ def generate_soil_investigation_report(project_info, spt_layers=None, cpt_points
         d_bot = float(lyr.get("depth_bot", d_top + 1.5))
         thick = round(d_bot - d_top, 2)
         n_spt = int(lyr.get("n_spt", 10))
-
-        # Modulus elastisitas tanah taksir: Es ≈ 500 * cu (lempung) atau 2000 * N (pasir)
         cu_val = float(lyr.get("cu", lyr.get("c", 25.0)))
         es_val = round((cu_val * 0.4) if cu_val > 0 else (n_spt * 2.0), 1)
 
@@ -456,7 +464,7 @@ def generate_soil_investigation_report(project_info, spt_layers=None, cpt_points
             f"Lapisan {idx}",
             d_top,
             d_bot,
-            f"=C{r_p}-B{r_p}",  # Rumus tebal aktif
+            thick,
             lyr.get("soil_type", "Tanah"),
             "CH/CL" if cu_val > 30 else "SM/ML",
             lyr.get("deskripsi", "-"),
@@ -472,6 +480,10 @@ def generate_soil_investigation_report(project_info, spt_layers=None, cpt_points
             cell.font = font_reg
             cell.fill = r_fill
             cell.alignment = align_left if c_i in [5, 7] else align_center
+            if c_i in [2, 3, 4]:
+                cell.number_format = '0.00'
+            elif c_i in [8, 9, 10, 11]:
+                cell.number_format = '0.0'
             _style_border(cell)
 
     end_prof_r = r_prof + len(spt_layers)
@@ -498,7 +510,6 @@ def generate_soil_investigation_report(project_info, spt_layers=None, cpt_points
     ws5["A4"] = "1. RANGKUMAN PARAMETER TANAH DESAIN (ZONA FONDASI DANGKAL 0 - 3.0 M)"
     ws5["A4"].font = font_section
 
-    # Rata-rata terbobot zona fondasi dangkal
     avg_cu = round(sum(float(l.get("cu", 20.0)) for l in spt_layers[:2]) / max(1, len(spt_layers[:2])), 1)
     avg_phi = round(sum(float(l.get("phi_eff", 24.0)) for l in spt_layers[:2]) / max(1, len(spt_layers[:2])), 1)
     avg_gamma = round(sum(float(l.get("gamma", 17.5)) for l in spt_layers[:2]) / max(1, len(spt_layers[:2])), 1)
@@ -556,7 +567,7 @@ def generate_soil_investigation_report(project_info, spt_layers=None, cpt_points
 
 # =============================================================================
 # B. LAPORAN PERHITUNGAN PONDASI (FOUNDATION CALCULATION REPORT - 6 SHEETS)
-# DENGAN RUMUS AKTIF EXCEL LENGKAP (SESUAI REFERENSI GAMBAR 4 & 5)
+# LENGKAP DENGAN SUBSTITUSI ANGKA RUNTUT & HASIL PASTI (NO BLANK CELLS)
 # =============================================================================
 
 def generate_foundation_calculation_report(
@@ -569,15 +580,17 @@ def generate_foundation_calculation_report(
 ):
     """
     Menghasilkan Dokumen Laporan Perhitungan Pondasi Lengkap (6 Sheets)
-    dengan RUMUS AKTIF EXCEL (Active Excel Formulas):
-    - Sheet 1: Design Criteria (Input Data & Parameter)
-    - Sheet 2: Soil Parameter (Data Karakteristik Tanah)
+    dengan RANGKAIAN RUMUS & SUBSTITUSI ANGKA RUNTUT:
+    - Sheet 1: Design Criteria (Input Data & Parameter Standar)
+    - Sheet 2: Soil Parameter (Faktor Daya Dukung & Korelasi Tanah)
     - Sheet 3: Foundation Dimension Calculation (Daya Dukung, Eksentrisitas & Tekanan Kontak)
-    - Sheet 4: Structural Calculation (Analisis Momen, Geser 1 Arah & Geser Pons 2 Arah)
-    - Sheet 5: Reinforcement Calculation (Luas Tulangan, Spasi, Jumlah Batang, Panjang & Berat Baja)
+    - Sheet 4: Structural Calculation (Momen Mu, Geser 1 Arah, Geser Pons 2 Arah SNI 2847)
+    - Sheet 5: Reinforcement Calculation (Tulangan Bawah, Tulangan Atas Kotak, BoQ)
     - Sheet 6: Final Design Summary (Rangkuman Akhir & Rekomendasi Desain)
     """
     wb = openpyxl.Workbook()
+    wb.calculation.fullCalcOnLoad = True
+    wb.calculation.calcMode = 'auto'
 
     font_main_title = Font(name="Calibri", size=15, bold=True, color="1E3A8A")
     font_sub_title = Font(name="Calibri", size=9, italic=True, color="64748B")
@@ -587,7 +600,7 @@ def generate_foundation_calculation_report(
     font_formula = Font(name="Consolas", size=9.5, color="1E40AF")
 
     fill_meta = PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid")
-    fill_input = PatternFill(start_color="E0F2FE", end_color="E0F2FE", fill_type="solid")  # Sel Input Biru Muda Khusus
+    fill_input = PatternFill(start_color="E0F2FE", end_color="E0F2FE", fill_type="solid")
     fill_zebra = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
     fill_white = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
     fill_safe = PatternFill(start_color="DCFCE7", end_color="DCFCE7", fill_type="solid")
@@ -603,96 +616,185 @@ def generate_foundation_calculation_report(
     align_left = Alignment(horizontal='left', vertical='center')
     align_right = Alignment(horizontal='right', vertical='center')
 
-    # Data Variabel Awal
     p_name = project_info.get("name", "Proyek Bangunan Cerdas")
     p_loc = project_info.get("location", "Semarang")
     p_eng = project_info.get("engineer", "Insinyur Sipil")
 
-    B_in = _clean_num(selected_dim.get("B", 2.0))
-    L_in = _clean_num(selected_dim.get("L", 2.0))
-    Df_in = _clean_num(selected_dim.get("Df", 1.5))
-    hf_in = _clean_num(selected_dim.get("hf", 0.45))
-    if hf_in <= 0:
-        hf_in = 0.45
-    sf_in = _clean_num(selected_dim.get("SF", 3.0))
+    B = _clean_num(selected_dim.get("B", 2.0))
+    L = _clean_num(selected_dim.get("L", 2.0))
+    Df = _clean_num(selected_dim.get("Df", 1.5))
+    hf = _clean_num(selected_dim.get("hf", 0.45))
+    if hf <= 0:
+        hf = 0.45
+    SF = _clean_num(selected_dim.get("SF", 3.0))
 
-    c_in = _clean_num(soil_params.get("cohesion", soil_params.get("c", 25.0)))
-    phi_in = _clean_num(soil_params.get("friction_angle", soil_params.get("phi", 20.0)))
-    gamma_in = _clean_num(soil_params.get("unit_weight", soil_params.get("gamma", 17.5)))
-    gamma_sat_in = _clean_num(soil_params.get("sat_unit_weight", soil_params.get("gamma_sat", 19.0)))
-    dw_in = _clean_num(soil_params.get("water_table", soil_params.get("dw", 1.50)))
+    c = _clean_num(soil_params.get("cohesion", soil_params.get("c", 25.0)))
+    phi = _clean_num(soil_params.get("friction_angle", soil_params.get("phi", 20.0)))
+    gamma = _clean_num(soil_params.get("unit_weight", soil_params.get("gamma", 17.5)))
+    gamma_sat = _clean_num(soil_params.get("sat_unit_weight", soil_params.get("gamma_sat", 19.0)))
+    dw = _clean_num(soil_params.get("water_table", soil_params.get("dw", 1.50)))
 
     P_servis = _clean_num(load_params.get("p_column", 350.0))
-    Pu_in = _clean_num(load_params.get("pu_column", P_servis * 1.35))
-    Mux_in = _clean_num(load_params.get("Mux", 15.0))
-    Muy_in = _clean_num(load_params.get("Muy", 10.0))
+    Pu = _clean_num(load_params.get("pu_column", P_servis * 1.35))
+    Mux = _clean_num(load_params.get("Mux", 15.0))
+    Muy = _clean_num(load_params.get("Muy", 10.0))
 
-    col_b_in = 0.40
-    col_h_in = 0.40
-    fc_in = 25.0
-    fy_in = 420.0
-    cover_in = 75.0
-    bar_dia_in = 16.0
+    col_b = 0.40
+    col_h = 0.40
+    fc = 25.0
+    fy = 420.0
+    cover = 75.0
+    bar_dia = 16.0
+
+    tz_fact = comp_results[0] if comp_results and len(comp_results) > 0 else {}
+    Nc = float(tz_fact.get("Nc", 14.8))
+    Nq = float(tz_fact.get("Nq", 6.4))
+    Ngamma = float(tz_fact.get("Ngamma", 5.4))
+    sc = float(tz_fact.get("sc", 1.3))
+    sq = float(tz_fact.get("sq", 1.0))
+    sgamma = float(tz_fact.get("sgamma", 0.8))
+
+    # Perhitungan Terzaghi Lengkap
+    A = round(B * L, 3)
+    Vf = round(B * L * hf, 3)
+    Wf = round(Vf * 24.0, 2)
+    ha = round(max(0.0, Df - hf), 3)
+    Ws = round(max(0.0, (A - (col_b * col_h)) * ha * gamma), 2)
+    Ptot = round(P_servis + Wf + Ws, 2)
+    po = round(gamma * Df, 2)
+    qu = round((1.3 * c * Nc) + (po * Nq) + (0.4 * gamma * B * Ngamma), 2)
+    qall = round(((qu - po) / SF) + po, 2)
+    q_avg = round(Ptot / A, 2)
+    Wx = round((B * (L**2)) / 6.0, 3)
+    ex = round(Mux / Pu, 3) if Pu > 0 else 0.0
+    ekern = round(L / 6.0, 3)
+    cek_e = "AMAN (TIDAK ADA UPLIFT)" if ex <= ekern else "PERINGATAN (TERJADI TARIKAN)"
+    qmax = round(q_avg + (Mux / Wx if Wx > 0 else 0.0), 2)
+    eval_bearing = "AMAN (OK)" if qmax <= qall else "OVERSTRESSED - PERLU DIPERLEBAR"
+
+    # Perhitungan Struktur (SNI 2847:2019)
+    qu_net = round(Pu / A, 2)
+    d_mm = round((hf * 1000.0) - cover - (bar_dia / 2.0), 1)
+    Lcx_mm = round(((B * 1000.0) - (col_b * 1000.0)) / 2.0, 1)
+    Lcy_mm = round(((L * 1000.0) - (col_h * 1000.0)) / 2.0, 1)
+    Mux_face_kNm = round((qu_net * L * ((Lcx_mm / 1000.0)**2)) / 2.0, 2)
+    Muy_face_kNm = round((qu_net * B * ((Lcy_mm / 1000.0)**2)) / 2.0, 2)
+    Mu_max_kNm = max(Mux_face_kNm, Muy_face_kNm)
+
+    # Geser Satu Arah
+    x_crit_mm = round(max(0.0, Lcx_mm - d_mm), 1)
+    Vu1_kN = round(qu_net * L * (x_crit_mm / 1000.0), 2)
+    phi_Vc1_kN = round((0.75 * 0.17 * math.sqrt(fc) * (L * 1000.0) * d_mm) / 1000.0, 2)
+    UF_v1 = round(Vu1_kN / phi_Vc1_kN, 3) if phi_Vc1_kN > 0 else 0.0
+    Cek_Vu1 = "AMAN (OK)" if Vu1_kN <= phi_Vc1_kN else "TIDAK AMAN - PERLU PERTEBAL hf"
+
+    # Geser Pons Dua Arah
+    bo_mm = round(2.0 * ((col_b * 1000.0) + (col_h * 1000.0) + (2.0 * d_mm)), 1)
+    Ao_m2 = round(((col_b * 1000.0) + d_mm) * ((col_h * 1000.0) + d_mm) / 1e6, 4)
+    Vu2_kN = round(Pu - (qu_net * Ao_m2), 2)
+    phi_Vc2_kN = round((0.75 * 0.33 * math.sqrt(fc) * bo_mm * d_mm) / 1000.0, 2)
+    UF_v2 = round(Vu2_kN / phi_Vc2_kN, 3) if phi_Vc2_kN > 0 else 0.0
+    Cek_Vu2 = "AMAN (OK)" if Vu2_kN <= phi_Vc2_kN else "TIDAK AMAN - TEBAL PONDASI KURANG"
+
+    # Penulangan Bawah
+    Rn = round((Mu_max_kNm * 1e6) / (0.9 * (L * 1000.0) * (d_mm**2)), 3)
+    rho_req = round((0.85 * fc / fy) * (1.0 - math.sqrt(max(0.0, 1.0 - (2.0 * Rn / (0.85 * fc))))), 5)
+    rho_min = round(0.0018 * (420.0 / fy), 5)
+    rho_des = max(rho_req, rho_min)
+    As_req_x = round(rho_des * (L * 1000.0) * d_mm, 1)
+    Ab_mm2 = round((math.pi / 4.0) * (bar_dia**2), 1)
+    n_x = max(4, int(math.ceil(As_req_x / Ab_mm2)))
+    s_x = round(((B * 1000.0) - (2.0 * cover) - bar_dia) / (n_x - 1), 0)
+    s_max = min(round(3.0 * (hf * 1000.0), 0), 450.0)
+    cek_s_x = "AMAN (MEMENUHI SPASI)" if s_x <= s_max else "SPASI TERLALU LEBAR"
+    notasi_x = f"D{int(bar_dia)}-{int(s_x)} mm ({n_x} btg)"
+
+    As_req_y = round(rho_des * (B * 1000.0) * d_mm, 1)
+    n_y = max(4, int(math.ceil(As_req_y / Ab_mm2)))
+    s_y = round(((L * 1000.0) - (2.0 * cover) - bar_dia) / (n_y - 1), 0)
+    notasi_y = f"D{int(bar_dia)}-{int(s_y)} mm ({n_y} btg)"
+
+    # Penulangan Atas (Keranjang Kotak)
+    D_top = max(10, int(bar_dia - 3))
+    Ab_top = round((math.pi / 4.0) * (D_top**2), 1)
+    As_top_min = round(0.0018 * 420.0 / fy * (L * 1000.0) * (hf * 1000.0), 1)
+    n_top_x = max(3, int(math.ceil(As_top_min / Ab_top)))
+    s_top_x = round(((B * 1000.0) - (2.0 * cover) - D_top) / max(1, n_top_x - 1), 0)
+    notasi_top_x = f"D{D_top}-{int(s_top_x)} mm ({n_top_x} btg)"
+
+    n_top_y = max(3, int(math.ceil(As_top_min / Ab_top)))
+    s_top_y = round(((L * 1000.0) - (2.0 * cover) - D_top) / max(1, n_top_y - 1), 0)
+    notasi_top_y = f"D{D_top}-{int(s_top_y)} mm ({n_top_y} btg)"
+
+    # BoQ
+    w_bar_kg_m = round(0.006165 * (bar_dia**2), 3)
+    w_top_kg_m = round(0.006165 * (D_top**2), 3)
+    Ltot_bot_m = round((n_x * (B + 0.30)) + (n_y * (L + 0.30)), 2)
+    Ltot_top_m = round((n_top_x * (B + 0.30)) + (n_top_y * (L + 0.30)), 2)
+    W_steel_kg = round((Ltot_bot_m * w_bar_kg_m) + (Ltot_top_m * w_top_kg_m) + 12.0, 1)
+    rasio_kg_m3 = round(W_steel_kg / Vf, 1) if Vf > 0 else 0.0
 
     # -------------------------------------------------------------------------
-    # SHEET 1: DESIGN CRITERIA (PERSIS FORMAT GAMBAR REFERENSI 4 & 5)
+    # SHEET 1: DESIGN CRITERIA
     # -------------------------------------------------------------------------
     ws1 = wb.active
     ws1.title = "Design Criteria"
     ws1.views.sheetView[0].showGridLines = True
     _setup_page_print(ws1, landscape=False)
 
-    ws1["A1"] = "ISOLATED FOUNDATION DESIGN CRITERIA - TAPAK CERDAS"
+    ws1["A1"] = "DESIGN CRITERIA & BASIS OF CALCULATION"
     ws1["A1"].font = font_main_title
-    ws1["A2"] = "Standar Desain: SNI 1727:2020, SNI 2847:2019, SNI 8460:2017 & ACI 318M"
+    ws1["A2"] = "Parameter Desain Struktur Pondasi Tapak Berdasarkan SNI 1727:2020 & SNI 2847:2019"
     ws1["A2"].font = font_sub_title
 
-    # Header Proyek Block (Sesuai Referensi Gambar 4)
-    ws1["A4"] = "Nama Proyek:"
+    ws1["A4"] = "PROYEK:"
+    ws1["A4"].font = font_bold
     ws1["B4"] = p_name
-    ws1["A5"] = "Engineer:"
-    ws1["B5"] = p_eng
-    ws1["D4"] = "Tanggal:"
-    ws1["E4"] = "2026-11-12"
-    ws1["D5"] = "Checked By:"
-    ws1["E5"] = "Senior Structural Eng."
+    ws1["B4"].font = font_bold
+    ws1["D4"] = "TANGGAL:"
+    ws1["D4"].font = font_bold
+    ws1["E4"] = project_info.get("date", "2026-11-12")
 
-    for cell_id in ["A4", "A5", "D4", "D5"]:
-        ws1[cell_id].font = font_bold
-        ws1[cell_id].fill = fill_meta
-        ws1[cell_id].border = thin_border
-    for cell_id in ["B4", "B5", "E4", "E5"]:
-        ws1[cell_id].font = font_reg
-        ws1[cell_id].border = thin_border
+    ws1["A5"] = "LOKASI:"
+    ws1["A5"].font = font_bold
+    ws1["B5"] = p_loc
+    ws1["D5"] = "PERENCANA:"
+    ws1["D5"].font = font_bold
+    ws1["E5"] = p_eng
 
-    # Input Data Tabel dengan Format Khusus (Sel Input Berwarna Biru Muda)
+    headers_dc = ["Parameter Desain", "Simbol", "=", "Nilai Input", "Satuan"]
+    for c_i, h in enumerate(headers_dc, 1):
+        cell = ws1.cell(row=7, column=c_i, value=h)
+        _style_header_cell(cell, fill_color="1E3A8A", text_color="FFFFFF", bold=True, size=9)
+        _style_border(cell)
+
     criteria_inputs = [
         ("A. DATA STRUKTUR & MATERIAL", "", "", ""),
-        ("Lebar Fondasi", "B", B_in, "m"),           # Row 9
-        ("Panjang Fondasi", "L", L_in, "m"),         # Row 10
-        ("Tebal Pelat Fondasi", "hf", hf_in, "m"),    # Row 11
-        ("Kedalaman Dasar Fondasi", "Df", Df_in, "m"),# Row 12
-        ("Lebar Kolom / Pedestal X", "bc", col_b_in, "m"), # Row 13
-        ("Panjang Kolom / Pedestal Y", "hc", col_h_in, "m"), # Row 14
-        ("Mutu Kuat Tekan Beton", "f'c", fc_in, "MPa"), # Row 15
-        ("Mutu Kuat Leleh Baja", "fy", fy_in, "MPa"),  # Row 16
-        ("Tebal Selimut Beton Bersih", "cc", cover_in, "mm"), # Row 17
-        ("Diameter Tulangan Utama", "D", bar_dia_in, "mm"), # Row 18
-        ("Berat Jenis Beton Bertulang", "γc", 24.0, "kN/m³"), # Row 19
+        ("Lebar Fondasi", "B", B, "m"),
+        ("Panjang Fondasi", "L", L, "m"),
+        ("Tebal Pelat Fondasi", "hf", hf, "m"),
+        ("Kedalaman Dasar Fondasi", "Df", Df, "m"),
+        ("Lebar Kolom / Pedestal X", "bc", col_b, "m"),
+        ("Panjang Kolom / Pedestal Y", "hc", col_h, "m"),
+        ("Mutu Kuat Tekan Beton", "f'c", fc, "MPa"),
+        ("Mutu Kuat Leleh Baja", "fy", fy, "MPa"),
+        ("Tebal Selimut Beton Bersih", "cc", cover, "mm"),
+        ("Diameter Tulangan Utama", "D", bar_dia, "mm"),
+        ("Berat Jenis Beton Bertulang", "γc", 24.0, "kN/m³"),
         ("", "", "", ""),
         ("B. DATA TANAH DASAR & MUKA AIR", "", "", ""),
-        ("Kohesi Tanah Dasar", "c", c_in, "kPa"), # Row 22
-        ("Sudut Geser Dalam", "φ", phi_in, "derajat"), # Row 23
-        ("Berat Volume Tanah Basah", "γ", gamma_in, "kN/m³"), # Row 24
-        ("Berat Volume Tanah Jenuh Air", "γsat", gamma_sat_in, "kN/m³"), # Row 25
-        ("Kedalaman Muka Air Tanah (MAT)", "dw", dw_in, "m"), # Row 26
-        ("Target Faktor Keamanan", "SF", sf_in, "-"), # Row 27
+        ("Kohesi Tanah Dasar", "c", c, "kPa"),
+        ("Sudut Geser Dalam", "φ", phi, "derajat"),
+        ("Berat Volume Tanah Basah", "γ", gamma, "kN/m³"),
+        ("Berat Volume Tanah Jenuh Air", "γsat", gamma_sat, "kN/m³"),
+        ("Kedalaman Muka Air Tanah (MAT)", "dw", dw, "m"),
+        ("Target Faktor Keamanan", "SF", SF, "-"),
         ("", "", "", ""),
         ("C. DATA PEMBEBANAN STRUKTUR", "", "", ""),
-        ("Beban Aksial Servis", "P", P_servis, "kN"), # Row 30
-        ("Beban Aksial Terfaktor", "Pu", Pu_in, "kN"), # Row 31
-        ("Momen Terfaktor Arah X", "Mux", Mux_in, "kN.m"), # Row 32
-        ("Momen Terfaktor Arah Y", "Muy", Muy_in, "kN.m")  # Row 33
+        ("Beban Aksial Servis", "P", P_servis, "kN"),
+        ("Beban Aksial Terfaktor", "Pu", Pu, "kN"),
+        ("Momen Terfaktor Arah X", "Mux", Mux, "kN.m"),
+        ("Momen Terfaktor Arah Y", "Muy", Muy, "kN.m")
     ]
 
     r = 8
@@ -717,12 +819,13 @@ def generate_foundation_calculation_report(
         ws1[f"C{r}"].alignment = align_center
         ws1[f"C{r}"].border = thin_border
 
-        # Kolom Nilai D: Diberi Warna Input Khusus
         ws1[f"D{r}"] = val
         ws1[f"D{r}"].font = font_bold
         ws1[f"D{r}"].fill = fill_input
         ws1[f"D{r}"].alignment = align_center
         ws1[f"D{r}"].border = thin_border
+        if isinstance(val, (int, float)):
+            ws1[f"D{r}"].number_format = '0.00' if isinstance(val, float) else '0'
 
         ws1[f"E{r}"] = unit
         ws1[f"E{r}"].font = font_reg
@@ -750,8 +853,7 @@ def generate_foundation_calculation_report(
     ws2["A4"] = "1. FAKTOR KAPASITAS DUKUNG TERZAGHI & MEYERHOF"
     ws2["A4"].font = font_section
 
-    tz_fact = comp_results[0] if comp_results and len(comp_results) > 0 else {}
-    headers_sp = ["Parameter", "Simbol", "Rumus Referensi", "Nilai", "Satuan"]
+    headers_sp = ["Parameter", "Simbol", "Rumus Referensi", "Nilai Terhitung", "Satuan"]
     r_sp = 5
     for c_i, h in enumerate(headers_sp, 1):
         cell = ws2.cell(row=r_sp, column=c_i, value=h)
@@ -759,30 +861,31 @@ def generate_foundation_calculation_report(
         _style_border(cell)
 
     soil_factors = [
-        ("Faktor Kohesi", "Nc", "Tabel 3.1 Terzaghi / Meyerhof", tz_fact.get("Nc", 14.8), "-"),
-        ("Faktor Beban Samping", "Nq", "Tabel 3.1 Terzaghi / Meyerhof", tz_fact.get("Nq", 6.4), "-"),
-        ("Faktor Berat Tanah", "Nγ", "Tabel 3.1 Terzaghi / Meyerhof", tz_fact.get("Ngamma", 5.4), "-"),
-        ("Faktor Bentuk Kohesi", "sc", "1.0 + 0.2*(B/L)*(tan(45+φ/2))^2", tz_fact.get("sc", 1.3), "-"),
-        ("Faktor Bentuk Samping", "sq", "1.0 + 0.1*(B/L)*(tan(45+φ/2))^2", tz_fact.get("sq", 1.0), "-"),
-        ("Faktor Bentuk Berat Tanah", "sγ", "1.0 + 0.1*(B/L)*(tan(45+φ/2))^2", tz_fact.get("sgamma", 0.8), "-")
+        ("Faktor Kohesi", "Nc", f"Tabel 3.1 Terzaghi (φ={phi:.1f}°)", Nc, "-"),
+        ("Faktor Beban Samping", "Nq", f"Tabel 3.1 Terzaghi (φ={phi:.1f}°)", Nq, "-"),
+        ("Faktor Berat Tanah", "Nγ", f"Tabel 3.1 Terzaghi (φ={phi:.1f}°)", Ngamma, "-"),
+        ("Faktor Bentuk Kohesi", "sc", f"1.0 + 0.2*(B/L)*(tan(45+φ/2))²", sc, "-"),
+        ("Faktor Bentuk Samping", "sq", f"1.0 + 0.1*(B/L)*(tan(45+φ/2))²", sq, "-"),
+        ("Faktor Bentuk Berat Tanah", "sγ", f"1.0 + 0.1*(B/L)*(tan(45+φ/2))²", sgamma, "-")
     ]
 
     for item in soil_factors:
         r_sp += 1
         ws2[f"A{r_sp}"] = item[0]; ws2[f"A{r_sp}"].font = font_reg; ws2[f"A{r_sp}"].border = thin_border
         ws2[f"B{r_sp}"] = item[1]; ws2[f"B{r_sp}"].font = font_bold; ws2[f"B{r_sp}"].alignment = align_center; ws2[f"B{r_sp}"].border = thin_border
-        ws2[f"C{r_sp}"] = item[2]; ws2[f"C{r_sp}"].font = font_sub_title; ws2[f"C{r_sp}"].border = thin_border
+        ws2[f"C{r_sp}"] = item[2]; ws2[f"C{r_sp}"].font = font_formula; ws2[f"C{r_sp}"].border = thin_border
         ws2[f"D{r_sp}"] = item[3]; ws2[f"D{r_sp}"].font = font_bold; ws2[f"D{r_sp}"].alignment = align_center; ws2[f"D{r_sp}"].border = thin_border
+        ws2[f"D{r_sp}"].number_format = '0.00'
         ws2[f"E{r_sp}"] = item[4]; ws2[f"E{r_sp}"].font = font_reg; ws2[f"E{r_sp}"].alignment = align_center; ws2[f"E{r_sp}"].border = thin_border
 
     ws2.column_dimensions["A"].width = 28
     ws2.column_dimensions["B"].width = 10
-    ws2.column_dimensions["C"].width = 35
-    ws2.column_dimensions["D"].width = 12
+    ws2.column_dimensions["C"].width = 38
+    ws2.column_dimensions["D"].width = 16
     ws2.column_dimensions["E"].width = 10
 
     # -------------------------------------------------------------------------
-    # SHEET 3: FOUNDATION DIMENSION CALCULATION (RUMUS AKTIF EXCEL LENGKAP)
+    # SHEET 3: FOUNDATION DIMENSION CALCULATION (SUBSTITUSI ANGKA RUNTUT)
     # -------------------------------------------------------------------------
     ws3 = wb.create_sheet(title="Dimension Calculation")
     ws3.views.sheetView[0].showGridLines = True
@@ -790,58 +893,58 @@ def generate_foundation_calculation_report(
 
     ws3["A1"] = "PERHITUNGAN DIMENSI & TEGANGAN KONTAK TANAH FONDASI"
     ws3["A1"].font = font_main_title
-    ws3["A2"] = "Seluruh Hasil Perhitungan Menggunakan Rumus Aktif Excel Berdasarkan Sheet 'Design Criteria'"
+    ws3["A2"] = "Rangkaian Perhitungan Runtut dengan Substitusi Angka Berdasarkan Sheet 'Design Criteria'"
     ws3["A2"].font = font_sub_title
 
-    headers_dim = ["Item Perhitungan", "Simbol", "Persamaan Excel Aktif", "Hasil Rumus Excel", "Satuan", "Status / Catatan"]
+    headers_dim = ["Item Perhitungan", "Simbol", "Alur Rumus & Substitusi Angka Runtut", "Hasil Perhitungan", "Satuan", "Status / Catatan"]
     r_dim = 4
     for c_i, h in enumerate(headers_dim, 1):
         cell = ws3.cell(row=r_dim, column=c_i, value=h)
         _style_header_cell(cell, fill_color="1E3A8A", text_color="FFFFFF", bold=True, size=9)
         _style_border(cell)
 
-    # RUMUS-RUMUS AKTIF EXCEL PONDASI DANGKAL:
-    # B ada di 'Design Criteria'!D9, L di 'Design Criteria'!D10, hf di 'Design Criteria'!D11, Df di 'Design Criteria'!D12
-    # P_servis di 'Design Criteria'!D30, c di 'Design Criteria'!D22, phi di 'Design Criteria'!D23, gamma di 'Design Criteria'!D24
     dim_calcs = [
-        ("Luas Tapak Fondasi", "A", "='Design Criteria'!D9*'Design Criteria'!D10", "m²", "Luas bidang kontak dasar"),
-        ("Volume Beton Fondasi", "Vf", "='Design Criteria'!D9*'Design Criteria'!D10*'Design Criteria'!D11", "m³", "Volume pelat"),
-        ("Berat Sendiri Fondasi", "Wf", "=D6*'Design Criteria'!D19", "kN", "Beban sendiri pelat beton"),
-        ("Tebal Tanah Urug di Atas Fondasi", "ha", "='Design Criteria'!D12-'Design Criteria'!D11", "m", "Tanah di atas pelat"),
-        ("Berat Tanah di Atas Fondasi", "Ws", "=(D5-('Design Criteria'!D13*'Design Criteria'!D14))*D8*'Design Criteria'!D17", "kN", "Overburden di atas pelat"),
-        ("Total Beban Aksial Servis", "Ptot", "='Design Criteria'!D30+D7+D9", "kN", "Total gaya normal"),
-        ("Tegangan Overburden Dasar Fondasi", "po", "='Design Criteria'!D17*'Design Criteria'!D12", "kPa", "Tegangan overburden po = γ*Df"),
-        ("Kapasitas Ultimit qu (Terzaghi)", "qu", "=1.3*'Design Criteria'!D22*'Soil Parameter'!D6+D11*'Soil Parameter'!D7+0.4*'Design Criteria'!D17*'Design Criteria'!D9*'Soil Parameter'!D8", "kPa", "Rumus qu Terzaghi"),
-        ("Daya Dukung Izin qall (SF=3)", "qall", "=(D12-D11)/'Design Criteria'!D27+D11", "kPa", "qall neto + overburden"),
-        ("Tekanan Kontak Rata-Rata", "q_avg", "=D10/D5", "kPa", "Tekanan kontak tanah q = Ptot / A"),
-        ("Tahanan Momen Dasar Tapak", "Wx", "=('Design Criteria'!D9*('Design Criteria'!D10^2))/6", "m³", "Modulus tampang W = B*L^2 / 6"),
-        ("Eksentrisitas Beban Arah X", "ex", "='Design Criteria'!D32/'Design Criteria'!D31", "m", "ex = Mux / Pu"),
-        ("Batas Maksimum Eksentrisitas (Kern)", "ekern", "='Design Criteria'!D10/6", "m", "Batas kern e <= L/6"),
-        ("Kontrol Eksentrisitas (Tidak Tarik)", "Cek-e", '=IF(D16<=D17, "AMAN (TIDAK ADA UPLIFT)", "PERINGATAN (TERJADI TARIKAN)")', "-", "Kontrol kemurnian tekan"),
-        ("Tekanan Kontak Maksimum", "q_max", "=D14+('Design Criteria'!D32/D15)", "kPa", "qmax = P/A + M/W"),
-        ("EVALUASI KEAMANAN DAYA DUKUNG", "Status", '=IF(D19<=D13, "AMAN (OK)", "OVERSTRESSED - PERLU DIPERLEBAR")', "-", "qmax <= qall")
+        ("Luas Tapak Fondasi", "A", f"B × L = {B:.2f} × {L:.2f}", A, "m²", "Luas bidang kontak dasar"),
+        ("Volume Beton Fondasi", "Vf", f"B × L × hf = {B:.2f} × {L:.2f} × {hf:.2f}", Vf, "m³", "Volume pelat beton"),
+        ("Berat Sendiri Fondasi", "Wf", f"Vf × γc = {Vf:.2f} × 24.0", Wf, "kN", "Beban sendiri pelat beton"),
+        ("Tebal Tanah di Atas Fondasi", "ha", f"Df - hf = {Df:.2f} - {hf:.2f}", ha, "m", "Tanah urug di atas pelat"),
+        ("Berat Tanah di Atas Fondasi", "Ws", f"(A - Ab) × ha × γ = ({A:.2f} - {col_b*col_h:.2f}) × {ha:.2f} × {gamma:.1f}", Ws, "kN", "Overburden di atas pelat"),
+        ("Total Beban Aksial Servis", "Ptot", f"P + Wf + Ws = {P_servis:.1f} + {Wf:.1f} + {Ws:.1f}", Ptot, "kN", "Total gaya normal servis"),
+        ("Tegangan Overburden Dasar", "po", f"γ × Df = {gamma:.1f} × {Df:.2f}", po, "kPa", "Tegangan overburden po = γ*Df"),
+        ("Kapasitas Ultimit qu (Terzaghi)", "qu", f"1.3·c·Nc + po·Nq + 0.4·γ·B·Nγ = 1.3·{c:.1f}·{Nc:.1f} + {po:.1f}·{Nq:.1f} + 0.4·{gamma:.1f}·{B:.1f}·{Ngamma:.1f}", qu, "kPa", "Kapasitas ultimit Terzaghi"),
+        ("Daya Dukung Izin qall", "qall", f"(qu - po)/SF + po = ({qu:.1f} - {po:.1f})/{SF:.1f} + {po:.1f}", qall, "kPa", f"Target Safety Factor SF={SF:.1f}"),
+        ("Tekanan Kontak Rata-Rata", "q_avg", f"Ptot / A = {Ptot:.1f} / {A:.2f}", q_avg, "kPa", "Tekanan kontak tanah q = Ptot / A"),
+        ("Tahanan Momen Tapak", "Wx", f"B × L² / 6 = {B:.2f} × {L:.2f}² / 6", Wx, "m³", "Modulus penampang dasar W"),
+        ("Eksentrisitas Beban Arah X", "ex", f"Mux / Pu = {Mux:.1f} / {Pu:.1f}", ex, "m", "ex = Mux / Pu"),
+        ("Batas Maksimum Eksentrisitas (Kern)", "ekern", f"L / 6 = {L:.2f} / 6", ekern, "m", "Batas kern e <= L/6"),
+        ("Kontrol Eksentrisitas (Tidak Tarik)", "Cek-e", f"ex <= ekern ({ex:.3f} m <= {ekern:.3f} m)", cek_e, "-", "Kontrol kemurnian tekan tapak"),
+        ("Tekanan Kontak Maksimum", "q_max", f"Ptot/A + Mux/Wx = {q_avg:.1f} + {Mux/Wx:.1f}", qmax, "kPa", "qmax = P/A + M/W"),
+        ("EVALUASI KEAMANAN DAYA DUKUNG", "Status", f"qmax <= qall ({qmax:.1f} kPa <= {qall:.1f} kPa)", eval_bearing, "-", "Syarat batas aman geoteknik")
     ]
 
     for item in dim_calcs:
         r_dim += 1
-        ws3[f"A{r_dim}"] = item[0]; ws3[f"A{r_dim}"].font = font_bold if "EVALUASI" in item[0] else font_reg; ws3[f"A{r_dim}"].border = thin_border
+        is_eval = "EVALUASI" in item[0]
+        ws3[f"A{r_dim}"] = item[0]; ws3[f"A{r_dim}"].font = font_bold if is_eval else font_reg; ws3[f"A{r_dim}"].border = thin_border
         ws3[f"B{r_dim}"] = item[1]; ws3[f"B{r_dim}"].font = font_bold; ws3[f"B{r_dim}"].alignment = align_center; ws3[f"B{r_dim}"].border = thin_border
         ws3[f"C{r_dim}"] = item[2]; ws3[f"C{r_dim}"].font = font_formula; ws3[f"C{r_dim}"].border = thin_border
-        ws3[f"D{r_dim}"] = item[2]; ws3[f"D{r_dim}"].font = font_bold; ws3[f"D{r_dim}"].alignment = align_center; ws3[f"D{r_dim}"].border = thin_border
-        if "EVALUASI" in item[0]:
+        ws3[f"D{r_dim}"] = item[3]; ws3[f"D{r_dim}"].font = font_bold; ws3[f"D{r_dim}"].alignment = align_center; ws3[f"D{r_dim}"].border = thin_border
+        if isinstance(item[3], (int, float)):
+            ws3[f"D{r_dim}"].number_format = '0.00'
+        if is_eval or "AMAN" in str(item[3]):
             ws3[f"D{r_dim}"].fill = fill_safe
-        ws3[f"E{r_dim}"] = item[3]; ws3[f"E{r_dim}"].font = font_reg; ws3[f"E{r_dim}"].alignment = align_center; ws3[f"E{r_dim}"].border = thin_border
-        ws3[f"F{r_dim}"] = item[4]; ws3[f"F{r_dim}"].font = font_sub_title; ws3[f"F{r_dim}"].border = thin_border
+        ws3[f"E{r_dim}"] = item[4]; ws3[f"E{r_dim}"].font = font_reg; ws3[f"E{r_dim}"].alignment = align_center; ws3[f"E{r_dim}"].border = thin_border
+        ws3[f"F{r_dim}"] = item[5]; ws3[f"F{r_dim}"].font = font_sub_title; ws3[f"F{r_dim}"].border = thin_border
 
     ws3.column_dimensions["A"].width = 34
     ws3.column_dimensions["B"].width = 10
-    ws3.column_dimensions["C"].width = 42
+    ws3.column_dimensions["C"].width = 54
     ws3.column_dimensions["D"].width = 24
     ws3.column_dimensions["E"].width = 10
     ws3.column_dimensions["F"].width = 32
 
     # -------------------------------------------------------------------------
-    # SHEET 4: STRUCTURAL CALCULATION (SNI 2847:2019 DENGAN RUMUS AKTIF EXCEL)
+    # SHEET 4: STRUCTURAL CALCULATION (SNI 2847:2019)
     # -------------------------------------------------------------------------
     ws4 = wb.create_sheet(title="Structural Calculation")
     ws4.views.sheetView[0].showGridLines = True
@@ -852,7 +955,7 @@ def generate_foundation_calculation_report(
     ws4["A2"] = "Pemeriksaan Momen Terfaktor, Geser Lentur Satu Arah, dan Geser Pons Dua Arah"
     ws4["A2"].font = font_sub_title
 
-    headers_str = ["Item Analisis Struktur", "Simbol", "Persamaan Excel Aktif", "Hasil Rumus Excel", "Satuan", "Keterangan / Evaluasi"]
+    headers_str = ["Item Analisis Struktur", "Simbol", "Alur Rumus & Substitusi Angka Runtut", "Hasil Perhitungan", "Satuan", "Keterangan / Evaluasi"]
     r_str = 4
     for c_i, h in enumerate(headers_str, 1):
         cell = ws4.cell(row=r_str, column=c_i, value=h)
@@ -860,48 +963,56 @@ def generate_foundation_calculation_report(
         _style_border(cell)
 
     struct_calcs = [
-        ("Tegangan Kontak Terfaktor Netto", "qu_net", "='Design Criteria'!D31/('Design Criteria'!D9*'Design Criteria'!D10)", "kPa", "qu = Pu / (B*L)"),
-        ("Tinggi Efektif Pelat Fondasi", "d", "=('Design Criteria'!D11*1000)-'Design Criteria'!D17-('Design Criteria'!D18/2)", "mm", "d = hf - cc - D/2"),
-        ("Panjang Kantilever Muka Kolom Arah X", "Lcx", "=(('Design Criteria'!D9*1000)-('Design Criteria'!D13*1000))/2", "mm", "Lcx = (B - bc) / 2"),
-        ("Panjang Kantilever Muka Kolom Arah Y", "Lcy", "=(('Design Criteria'!D10*1000)-('Design Criteria'!D14*1000))/2", "mm", "Lcy = (L - hc) / 2"),
-        ("Momen Lentur Terfaktor Muka Kolom X", "Mux_face", "=(D5/1000)*('Design Criteria'!D10*1000)*(D7^2)/2", "N.mm", "Mu = qu*L*Lcx^2 / 2"),
-        ("Momen Lentur Terfaktor Muka Kolom Y", "Muy_face", "=(D5/1000)*('Design Criteria'!D9*1000)*(D8^2)/2", "N.mm", "Mu = qu*B*Lcy^2 / 2"),
-        ("Momen Desain Maksimum", "Mu_max", "=MAX(D9, D10)/1e6", "kN.m", "Momen kritis penulangan"),
-        ("KONTROL GESER SATU ARAH (BEAM SHEAR)", "", "", "", ""),
-        ("Jarak Penampang Kritis Geser 1 Arah", "x_crit", "=D7-D6", "mm", "x = Lcant - d"),
-        ("Gaya Geser Terfaktor 1 Arah", "Vu1", "=IF(D13>0, (D5/1000)*('Design Criteria'!D10*1000)*D13/1000, 0)", "kN", "Vu1 = qu*L*(Lcant - d)"),
-        ("Kuat Geser Beton 1 Arah (φ=0.75)", "phi_Vc1", "=0.75*0.17*SQRT('Design Criteria'!D15)*('Design Criteria'!D10*1000)*D6/1000", "kN", "φVc1 = 0.75*0.17*√f'c*L*d"),
-        ("Rasio Geser 1 Arah", "UF_v1", "=D14/D15", "-", "Vu1 / φVc1"),
-        ("EVALUASI GESER SATU ARAH", "Cek_Vu1", '=IF(D14<=D15, "AMAN (OK)", "TIDAK AMAN - PERLU PERTEBAL hf")', "-", "Vu1 <= φVc1"),
-        ("KONTROL GESER PONS DUA ARAH (PUNCHING SHEAR)", "", "", "", ""),
-        ("Keliling Kritis Geser Pons", "bo", "=2*(('Design Criteria'!D13*1000)+D6+('Design Criteria'!D14*1000)+D6)", "mm", "bo = 2*(bc + hc + 2d)"),
-        ("Luas Area Dalam Perimeter Pons", "Ao", "=(('Design Criteria'!D13*1000)+D6)*(('Design Criteria'!D14*1000)+D6)", "mm²", "Ao = (bc+d)*(hc+d)"),
-        ("Gaya Geser Pons Terfaktor", "Vu2", "='Design Criteria'!D31-((D5/1000)*D19/1000)", "kN", "Vu2 = Pu - qu*Ao"),
-        ("Kuat Geser Pons Desain (φ=0.75)", "phi_Vc2", "=0.75*0.33*SQRT('Design Criteria'!D15)*D18*D6/1000", "kN", "φVc2 = 0.75*0.33*√f'c*bo*d"),
-        ("Rasio Geser Pons", "UF_v2", "=D20/D21", "-", "Vu2 / φVc2"),
-        ("EVALUASI GESER PONS DUA ARAH", "Cek_Vu2", '=IF(D20<=D21, "AMAN (OK)", "TIDAK AMAN - TEBAL PONDASI KURANG")', "-", "Vu2 <= φVc2")
+        ("Tegangan Kontak Terfaktor Netto", "qu_net", f"Pu / (B × L) = {Pu:.1f} / ({B:.2f} × {L:.2f})", qu_net, "kPa", "qu = Pu / (B*L)"),
+        ("Tinggi Efektif Pelat Fondasi", "d", f"hf - cc - D/2 = {hf*1000:.0f} - {cover:.0f} - {bar_dia/2:.1f}", d_mm, "mm", "d = hf - cc - D/2"),
+        ("Panjang Kantilever Muka Kolom X", "Lcx", f"(B - bc) / 2 = ({B*1000:.0f} - {col_b*1000:.0f}) / 2", Lcx_mm, "mm", "Lcx = (B - bc) / 2"),
+        ("Panjang Kantilever Muka Kolom Y", "Lcy", f"(L - hc) / 2 = ({L*1000:.0f} - {col_h*1000:.0f}) / 2", Lcy_mm, "mm", "Lcy = (L - hc) / 2"),
+        ("Momen Lentur Terfaktor Kolom X", "Mux_face", f"qu × L × Lcx² / 2 = {qu_net:.1f} × {L:.2f} × {Lcx_mm/1000:.3f}² / 2", Mux_face_kNm, "kN.m", "Momen lentur kritis muka kolom X"),
+        ("Momen Lentur Terfaktor Kolom Y", "Muy_face", f"qu × B × Lcy² / 2 = {qu_net:.1f} × {B:.2f} × {Lcy_mm/1000:.3f}² / 2", Muy_face_kNm, "kN.m", "Momen lentur kritis muka kolom Y"),
+        ("Momen Desain Maksimum", "Mu_max", f"max(Mux, Muy) = max({Mux_face_kNm:.2f}, {Muy_face_kNm:.2f})", Mu_max_kNm, "kN.m", "Momen kritis acuan penulangan"),
+        ("KONTROL GESER SATU ARAH", "", "", "", "", ""),
+        ("Jarak Penampang Kritis Geser 1 Arah", "x_crit", f"Lcx - d = {Lcx_mm:.0f} - {d_mm:.0f}", x_crit_mm, "mm", "Penampang kritis di jarak d dari kolom"),
+        ("Gaya Geser Terfaktor 1 Arah", "Vu1", f"qu × L × x_crit = {qu_net:.1f} × {L:.2f} × {x_crit_mm/1000:.3f}", Vu1_kN, "kN", "Vu1 = qu*L*(Lcant - d)"),
+        ("Kuat Geser Beton 1 Arah (φ=0.75)", "phi_Vc1", f"0.75 × 0.17 × √f'c × L × d = 0.75 × 0.17 × √{fc:.0f} × {L*1000:.0f} × {d_mm:.0f} / 1000", phi_Vc1_kN, "kN", "SNI 2847 Pasal 22.5"),
+        ("Rasio Geser 1 Arah", "UF_v1", f"Vu1 / φVc1 = {Vu1_kN:.1f} / {phi_Vc1_kN:.1f}", UF_v1, "-", "Utility Factor Geser 1 Arah"),
+        ("EVALUASI GESER SATU ARAH", "Cek_Vu1", f"Vu1 <= φVc1 ({Vu1_kN:.1f} kN <= {phi_Vc1_kN:.1f} kN)", Cek_Vu1, "-", "Syarat batas aman geser balok"),
+        ("KONTROL GESER PONS DUA ARAH", "", "", "", "", ""),
+        ("Keliling Kritis Geser Pons", "bo", f"2 × (bc + hc + 2d) = 2 × ({col_b*1000:.0f} + {col_h*1000:.0f} + 2·{d_mm:.0f})", bo_mm, "mm", "Perimeter geser pons penampang kritis"),
+        ("Luas Area Dalam Perimeter Pons", "Ao", f"(bc + d) × (hc + d) = {((col_b*1000)+d_mm)/1000:.3f} × {((col_h*1000)+d_mm)/1000:.3f}", Ao_m2, "m²", "Luas bidang dalam perimeter geser"),
+        ("Gaya Geser Pons Terfaktor", "Vu2", f"Pu - qu × Ao = {Pu:.1f} - ({qu_net:.1f} × {Ao_m2:.4f})", Vu2_kN, "kN", "Vu2 = Pu - qu*Ao"),
+        ("Kuat Geser Pons Desain (φ=0.75)", "phi_Vc2", f"0.75 × 0.33 × √f'c × bo × d = 0.75 × 0.33 × √{fc:.0f} × {bo_mm:.0f} × {d_mm:.0f} / 1000", phi_Vc2_kN, "kN", "SNI 2847 Pasal 22.6"),
+        ("Rasio Geser Pons", "UF_v2", f"Vu2 / φVc2 = {Vu2_kN:.1f} / {phi_Vc2_kN:.1f}", UF_v2, "-", "Utility Factor Geser Pons"),
+        ("EVALUASI GESER PONS DUA ARAH", "Cek_Vu2", f"Vu2 <= φVc2 ({Vu2_kN:.1f} kN <= {phi_Vc2_kN:.1f} kN)", Cek_Vu2, "-", "Syarat batas aman punching shear")
     ]
 
     for item in struct_calcs:
         r_str += 1
-        ws4[f"A{r_str}"] = item[0]; ws4[f"A{r_str}"].font = font_bold if "EVALUASI" in item[0] else font_reg; ws4[f"A{r_str}"].border = thin_border
+        if item[1] == "" and item[3] == "":
+            ws4[f"A{r_str}"] = item[0]
+            ws4[f"A{r_str}"].font = font_section
+            continue
+
+        is_eval = "EVALUASI" in item[0]
+        ws4[f"A{r_str}"] = item[0]; ws4[f"A{r_str}"].font = font_bold if is_eval else font_reg; ws4[f"A{r_str}"].border = thin_border
         ws4[f"B{r_str}"] = item[1]; ws4[f"B{r_str}"].font = font_bold; ws4[f"B{r_str}"].alignment = align_center; ws4[f"B{r_str}"].border = thin_border
         ws4[f"C{r_str}"] = item[2]; ws4[f"C{r_str}"].font = font_formula; ws4[f"C{r_str}"].border = thin_border
-        ws4[f"D{r_str}"] = item[2]; ws4[f"D{r_str}"].font = font_bold; ws4[f"D{r_str}"].alignment = align_center; ws4[f"D{r_str}"].border = thin_border
-        if "EVALUASI" in item[0]:
+        ws4[f"D{r_str}"] = item[3]; ws4[f"D{r_str}"].font = font_bold; ws4[f"D{r_str}"].alignment = align_center; ws4[f"D{r_str}"].border = thin_border
+        if isinstance(item[3], (int, float)):
+            ws4[f"D{r_str}"].number_format = '0.00'
+        if is_eval or "AMAN" in str(item[3]):
             ws4[f"D{r_str}"].fill = fill_safe
-        ws4[f"E{r_str}"] = item[3]; ws4[f"E{r_str}"].font = font_reg; ws4[f"E{r_str}"].alignment = align_center; ws4[f"E{r_dim}"].border = thin_border
-        ws4[f"F{r_str}"] = item[4]; ws4[f"F{r_str}"].font = font_sub_title; ws4[f"F{r_str}"].border = thin_border
+        ws4[f"E{r_str}"] = item[4]; ws4[f"E{r_str}"].font = font_reg; ws4[f"E{r_str}"].alignment = align_center; ws4[f"E{r_str}"].border = thin_border
+        ws4[f"F{r_str}"] = item[5]; ws4[f"F{r_str}"].font = font_sub_title; ws4[f"F{r_str}"].border = thin_border
 
     ws4.column_dimensions["A"].width = 34
     ws4.column_dimensions["B"].width = 12
-    ws4.column_dimensions["C"].width = 44
+    ws4.column_dimensions["C"].width = 54
     ws4.column_dimensions["D"].width = 24
     ws4.column_dimensions["E"].width = 10
-    ws4.column_dimensions["F"].width = 30
+    ws4.column_dimensions["F"].width = 32
 
     # -------------------------------------------------------------------------
-    # SHEET 5: REINFORCEMENT CALCULATION (RUMUS AKTIF PENULANGAN LENTUR)
+    # SHEET 5: REINFORCEMENT CALCULATION (PENULANGAN & KERANJANG KOTAK)
     # -------------------------------------------------------------------------
     ws5 = wb.create_sheet(title="Reinforcement Calculation")
     ws5.views.sheetView[0].showGridLines = True
@@ -909,10 +1020,10 @@ def generate_foundation_calculation_report(
 
     ws5["A1"] = "PERHITUNGAN KEBUTUHAN TULANGAN PONDASI (SNI 2847:2019)"
     ws5["A1"].font = font_main_title
-    ws5["A2"] = "Desain Tulangan Lentur Bawah Arah X & Y, Jarak Spasi, Detailing, dan Berat Baja"
+    ws5["A2"] = "Desain Tulangan Lentur Bawah Arah X & Y, Tulangan Atas Keranjang Kotak, Spasi & BoQ"
     ws5["A2"].font = font_sub_title
 
-    headers_reinf = ["Item Penulangan", "Simbol", "Persamaan Excel Aktif", "Hasil Rumus Excel", "Satuan", "Keterangan / Detailing"]
+    headers_reinf = ["Item Penulangan", "Simbol", "Alur Rumus & Substitusi Angka Runtut", "Hasil Perhitungan", "Satuan", "Keterangan / Detailing"]
     r_rf = 4
     for c_i, h in enumerate(headers_reinf, 1):
         cell = ws5.cell(row=r_rf, column=c_i, value=h)
@@ -920,49 +1031,62 @@ def generate_foundation_calculation_report(
         _style_border(cell)
 
     reinf_calcs = [
-        ("Koefisien Tahanan Momen Rn", "Rn", "=('Structural Calculation'!D9)/(0.9*('Design Criteria'!D10*1000)*('Structural Calculation'!D6^2))", "MPa", "Rn = Mu / (φ*b*d^2)"),
-        ("Rasio Tulangan Perlu", "ρ_perlu", "=(0.85*'Design Criteria'!D15/'Design Criteria'!D16)*(1-SQRT(MAX(0, 1-(2*D5/(0.85*'Design Criteria'!D15)))))", "-", "ρ = 0.85*fc/fy * (1-√(1-2Rn/0.85fc))"),
-        ("Rasio Tulangan Minimum Susut Suhu", "ρ_min", "=0.0018*(420/'Design Criteria'!D16)", "-", "ρmin = 0.0018*420/fy (SNI 2847)"),
-        ("Rasio Tulangan Desain", "ρ_desain", "=MAX(D6, D7)", "-", "ρ = max(ρ_perlu, ρ_min)"),
-        ("Luas Tulangan Perlu Total Arah X", "As_req_x", "=D8*('Design Criteria'!D10*1000)*'Structural Calculation'!D6", "mm²", "As = ρ * L * d"),
-        ("Luas 1 Batang Tulangan Utama", "Ab", "=(PI()/4)*('Design Criteria'!D18^2)", "mm²", "Ab = π/4 * D^2"),
-        ("Jumlah Batang Tulangan Arah X", "n_bars_x", "=CEILING(D9/D10, 1)", "batang", "n = Ceil(As_req / Ab)"),
-        ("Jarak Spasi Tulangan Arah X", "s_x", "=ROUND((('Design Criteria'!D9*1000)-(2*'Design Criteria'!D17)-'Design Criteria'!D18)/(D11-1), 0)", "mm", "s = (B - 2cc - D) / (n - 1)"),
-        ("Batas Spasi Maksimum SNI", "s_max", "=MIN(3*('Design Criteria'!D11*1000), 450)", "mm", "s_max = min(3*hf, 450 mm)"),
-        ("Kontrol Spasi Tulangan X", "Cek_s_x", '=IF(D12<=D13, "AMAN (MEMENUHI SPASI)", "SPASI TERLALU LEBAR")', "-", "s <= s_max"),
-        ("Rekomendasi Tulangan Terpasang X", "Notasi_X", '="D"&TEXT(\'Design Criteria\'!D18,"0")&"-"&TEXT(D12,"0")&" mm ("&TEXT(D11,"0")&" btg)"', "-", "Format konstruksi lapangan"),
-        ("", "", "", "", ""),
-        ("TULANGAN ARAH Y", "", "", "", ""),
-        ("Luas Tulangan Perlu Total Arah Y", "As_req_y", "=D8*('Design Criteria'!D9*1000)*'Structural Calculation'!D6", "mm²", "As = ρ * B * d"),
-        ("Jumlah Batang Tulangan Arah Y", "n_bars_y", "=CEILING(D17/D10, 1)", "batang", "n = Ceil(As_req / Ab)"),
-        ("Jarak Spasi Tulangan Arah Y", "s_y", "=ROUND((('Design Criteria'!D10*1000)-(2*'Design Criteria'!D17)-'Design Criteria'!D18)/(D18-1), 0)", "mm", "s = (L - 2cc - D) / (n - 1)"),
-        ("Rekomendasi Tulangan Terpasang Y", "Notasi_Y", '="D"&TEXT(\'Design Criteria\'!D18,"0")&"-"&TEXT(D19,"0")&" mm ("&TEXT(D18,"0")&" btg)"', "-", "Format konstruksi lapangan"),
-        ("", "", "", "", ""),
-        ("ESTIMASI KEBUTUHAN MATERIAL (BOQ)", "", "", "", ""),
-        ("Panjang Total Tulangan Baja", "Ltot_rebar", "=(D11*('Design Criteria'!D9+0.3))+(D18*('Design Criteria'!D10+0.3))", "m", "Total panjang tulangan + kait"),
-        ("Berat Satuan Besi Tulangan", "w_bar", "=0.006165*('Design Criteria'!D18^2)", "kg/m", "w = 0.006165 * D^2"),
-        ("Estimasi Total Berat Baja Tulangan", "W_steel", "=D22*D23", "kg", "Berat total tulangan pelat"),
-        ("Volume Beton Fondasi", "V_beton", "='Dimension Calculation'!D6", "m³", "Volume beton cor pelat fondasi"),
-        ("Rasio Tulangan per Volume Beton", "Rasio_kg_m3", "=D24/D25", "kg/m³", "Indeks efisiensi struktur (~50-80 kg/m³)")
+        ("Koefisien Tahanan Momen Rn", "Rn", f"Mu / (0.9 × L × d²) = {Mu_max_kNm*1e6:.0f} / (0.9 × {L*1000:.0f} × {d_mm:.0f}²)", Rn, "MPa", "Rn = Mu / (φ*b*d^2)"),
+        ("Rasio Tulangan Perlu", "ρ_perlu", f"0.85·fc/fy · (1 - √(1 - 2Rn/(0.85fc)))", rho_req, "-", "Rasio tulangan lentur perlu"),
+        ("Rasio Tulangan Minimum SNI", "ρ_min", f"0.0018 × (420 / fy) = 0.0018 × (420 / {fy:.0f})", rho_min, "-", "ρmin susut suhu SNI 2847"),
+        ("Rasio Tulangan Desain", "ρ_desain", f"max(ρ_perlu, ρ_min) = max({rho_req:.5f}, {rho_min:.5f})", rho_des, "-", "Rasio tulangan penentu"),
+        ("Luas Tulangan Perlu Total X", "As_req_x", f"ρ × L × d = {rho_des:.5f} × {L*1000:.0f} × {d_mm:.0f}", As_req_x, "mm²", "As = ρ * L * d"),
+        ("Luas 1 Batang Tulangan Utama", "Ab", f"π/4 × D² = π/4 × {bar_dia:.0f}²", Ab_mm2, "mm²", f"Diameter D{int(bar_dia)}"),
+        ("Jumlah Batang Tulangan Arah X", "n_bars_x", f"Ceil(As / Ab) = Ceil({As_req_x:.0f} / {Ab_mm2:.1f})", n_x, "batang", "Jumlah batang terpasang arah X"),
+        ("Jarak Spasi Tulangan Arah X", "s_x", f"(B - 2·cc - D)/(n - 1) = ({B*1000:.0f} - {2*cover:.0f} - {bar_dia:.0f}) / {n_x-1}", s_x, "mm", "Jarak bersih antar as tulangan"),
+        ("Batas Spasi Maksimum SNI", "s_max", f"min(3·hf, 450) = min({3*hf*1000:.0f}, 450)", s_max, "mm", "Batas spasi maksimum pelat"),
+        ("Kontrol Spasi Tulangan X", "Cek_s_x", f"s <= s_max ({s_x:.0f} mm <= {s_max:.0f} mm)", cek_s_x, "-", "Memenuhi batas spasi SNI"),
+        ("Rekomendasi Tulangan Terpasang X", "Notasi_X", "Format Notasi Konstruksi", notasi_x, "-", "Tulangan Bawah Arah X"),
+        ("", "", "", "", "", ""),
+        ("TULANGAN BAWAH ARAH Y", "", "", "", "", ""),
+        ("Luas Tulangan Perlu Total Y", "As_req_y", f"ρ × B × d = {rho_des:.5f} × {B*1000:.0f} × {d_mm:.0f}", As_req_y, "mm²", "As = ρ * B * d"),
+        ("Jumlah Batang Tulangan Arah Y", "n_bars_y", f"Ceil(As / Ab) = Ceil({As_req_y:.0f} / {Ab_mm2:.1f})", n_y, "batang", "Jumlah batang terpasang arah Y"),
+        ("Jarak Spasi Tulangan Arah Y", "s_y", f"(L - 2·cc - D)/(n - 1) = ({L*1000:.0f} - {2*cover:.0f} - {bar_dia:.0f}) / {n_y-1}", s_y, "mm", "Jarak bersih antar as tulangan"),
+        ("Rekomendasi Tulangan Terpasang Y", "Notasi_Y", "Format Notasi Konstruksi", notasi_y, "-", "Tulangan Bawah Arah Y"),
+        ("", "", "", "", "", ""),
+        ("TULANGAN ATAS & KERANJANG KOTAK (TOP REBAR BOX CAGE)", "", "", "", "", ""),
+        ("Rekomendasi Tulangan Atas Arah X", "Notasi_Top_X", f"Tulangan praktis atas penutup kotak", notasi_top_x, "-", "Kait 90° membengkok ke bawah"),
+        ("Rekomendasi Tulangan Atas Arah Y", "Notasi_Top_Y", f"Tulangan praktis atas penutup kotak", notasi_top_y, "-", "Kait 90° membengkok ke bawah"),
+        ("Pengikat Keranjang Kotak", "Sengkang_Tepi", "Begel keliling tepi pelat tapak", "Ø10-250 mm (Tepi Kotak)", "-", "Pengikat keranjang 3D"),
+        ("", "", "", "", "", ""),
+        ("ESTIMASI KEBUTUHAN MATERIAL (BOQ)", "", "", "", "", ""),
+        ("Panjang Total Tulangan Baja", "Ltot_rebar", f"Panjang batang bawah + atas + kait", Ltot_bot_m + Ltot_top_m, "m", "Total panjang baja"),
+        ("Berat Satuan Besi Tulangan D16", "w_bar", f"0.006165 × {bar_dia:.0f}²", w_bar_kg_m, "kg/m", "Standar BJTS 420"),
+        ("Estimasi Total Berat Baja Tulangan", "W_steel", f"Total berat baja fondasi + sengkang", W_steel_kg, "kg", "Baja tulangan total"),
+        ("Volume Beton Cor Fondasi", "V_beton", f"B × L × hf = {B:.2f} × {L:.2f} × {hf:.2f}", Vf, "m³", "Volume cor beton pelat"),
+        ("Rasio Tulangan per Volume Beton", "Rasio_kg_m3", f"W_steel / Vf = {W_steel_kg:.1f} / {Vf:.2f}", rasio_kg_m3, "kg/m³", "Indeks efisiensi struktur (~50-80 kg/m³)")
     ]
 
     for item in reinf_calcs:
         r_rf += 1
-        ws5[f"A{r_rf}"] = item[0]; ws5[f"A{r_rf}"].font = font_bold if "Rekomendasi" in item[0] or "ESTIMASI" in item[0] else font_reg; ws5[f"A{r_rf}"].border = thin_border
+        if item[1] == "" and item[3] == "":
+            ws5[f"A{r_rf}"] = item[0]
+            ws5[f"A{r_rf}"].font = font_section
+            continue
+
+        is_recom = "Rekomendasi" in item[0] or "ESTIMASI" in item[0]
+        ws5[f"A{r_rf}"] = item[0]; ws5[f"A{r_rf}"].font = font_bold if is_recom else font_reg; ws5[f"A{r_rf}"].border = thin_border
         ws5[f"B{r_rf}"] = item[1]; ws5[f"B{r_rf}"].font = font_bold; ws5[f"B{r_rf}"].alignment = align_center; ws5[f"B{r_rf}"].border = thin_border
         ws5[f"C{r_rf}"] = item[2]; ws5[f"C{r_rf}"].font = font_formula; ws5[f"C{r_rf}"].border = thin_border
-        ws5[f"D{r_rf}"] = item[2]; ws5[f"D{r_rf}"].font = font_bold; ws5[f"D{r_rf}"].alignment = align_center; ws5[f"D{r_rf}"].border = thin_border
-        if "Rekomendasi" in item[0]:
+        ws5[f"D{r_rf}"] = item[3]; ws5[f"D{r_rf}"].font = font_bold; ws5[f"D{r_rf}"].alignment = align_center; ws5[f"D{r_rf}"].border = thin_border
+        if isinstance(item[3], (int, float)):
+            ws5[f"D{r_rf}"].number_format = '0.00' if isinstance(item[3], float) else '0'
+        if is_recom or "AMAN" in str(item[3]):
             ws5[f"D{r_rf}"].fill = fill_safe
-        ws5[f"E{r_rf}"] = item[3]; ws5[f"E{r_rf}"].font = font_reg; ws5[f"E{r_rf}"].alignment = align_center; ws5[f"E{r_rf}"].border = thin_border
-        ws5[f"F{r_rf}"] = item[4]; ws5[f"F{r_rf}"].font = font_sub_title; ws5[f"F{r_rf}"].border = thin_border
+        ws5[f"E{r_rf}"] = item[4]; ws5[f"E{r_rf}"].font = font_reg; ws5[f"E{r_rf}"].alignment = align_center; ws5[f"E{r_rf}"].border = thin_border
+        ws5[f"F{r_rf}"] = item[5]; ws5[f"F{r_rf}"].font = font_sub_title; ws5[f"F{r_rf}"].border = thin_border
 
     ws5.column_dimensions["A"].width = 34
-    ws5.column_dimensions["B"].width = 12
-    ws5.column_dimensions["C"].width = 46
+    ws5.column_dimensions["B"].width = 14
+    ws5.column_dimensions["C"].width = 54
     ws5.column_dimensions["D"].width = 24
     ws5.column_dimensions["E"].width = 10
-    ws5.column_dimensions["F"].width = 30
+    ws5.column_dimensions["F"].width = 32
 
     # -------------------------------------------------------------------------
     # SHEET 6: FINAL DESIGN SUMMARY & BOQ
@@ -980,17 +1104,19 @@ def generate_foundation_calculation_report(
     ws6["A4"].font = font_section
 
     summary_items = [
-        ("Dimensi Tapak Fondasi Terpasang", "B x L", "='Design Criteria'!D9&\" x \"&'Design Criteria'!D10&\" meter\""),
-        ("Tebal Pelat Fondasi Terpasang", "hf", "='Design Criteria'!D11&\" meter (\"&TEXT('Design Criteria'!D11*100,\"0\")&\" cm)\""),
-        ("Kedalaman Galian Fondasi", "Df", "='Design Criteria'!D12&\" meter dari Muka Tanah Asli\""),
-        ("Mutu Beton Struktural (f'c)", "f'c", "='Design Criteria'!D15&\" MPa\""),
-        ("Mutu Baja Tulangan (fy)", "fy", "='Design Criteria'!D16&\" MPa\""),
-        ("Tebal Selimut Beton Bersih (cc)", "cc", "='Design Criteria'!D17&\" mm (Standar Kontak Tanah SNI)\""),
-        ("Tulangan Bawah Arah X", "Rebar-X", "='Reinforcement Calculation'!D15"),
-        ("Tulangan Bawah Arah Y", "Rebar-Y", "='Reinforcement Calculation'!D20"),
-        ("Estimasi Total Volume Beton", "V_beton", "='Reinforcement Calculation'!D25&\" m³\""),
-        ("Estimasi Total Berat Besi Tulangan", "W_besi", "=TEXT('Reinforcement Calculation'!D24,\"0.0\")&\" kg\""),
-        ("Rasio Besi per Volume Beton", "Rasio", "=TEXT('Reinforcement Calculation'!D26,\"0.0\")&\" kg/m³ (Struktur Ekonomis)\"")
+        ("Dimensi Tapak Fondasi Terpasang", "B x L", f"{B:.2f} x {L:.2f} meter"),
+        ("Tebal Pelat Fondasi Terpasang", "hf", f"{hf:.2f} meter ({int(hf*100)} cm)"),
+        ("Kedalaman Galian Fondasi", "Df", f"{Df:.2f} meter dari Muka Tanah Asli"),
+        ("Mutu Beton Struktural (f'c)", "f'c", f"{fc:.1f} MPa"),
+        ("Mutu Baja Tulangan (fy)", "fy", f"{fy:.1f} MPa"),
+        ("Tebal Selimut Beton Bersih (cc)", "cc", f"{cover:.0f} mm (Kontak Tanah SNI)"),
+        ("Tulangan Bawah Arah X", "Rebar-X", notasi_x),
+        ("Tulangan Bawah Arah Y", "Rebar-Y", notasi_y),
+        ("Tulangan Atas Arah X (Kotak)", "Rebar-Top-X", notasi_top_x),
+        ("Tulangan Atas Arah Y (Kotak)", "Rebar-Top-Y", notasi_top_y),
+        ("Estimasi Total Volume Beton", "V_beton", f"{Vf:.2f} m³"),
+        ("Estimasi Total Berat Besi Tulangan", "W_besi", f"{W_steel_kg:.1f} kg"),
+        ("Rasio Besi per Volume Beton", "Rasio", f"{rasio_kg_m3:.1f} kg/m³ (Struktur Ekonomis)")
     ]
 
     r_fs = 5
@@ -1008,11 +1134,11 @@ def generate_foundation_calculation_report(
     r_fs += 1
 
     checks_matrix = [
-        ("Kapasitas Daya Dukung Tanah (Geoteknik)", "qmax <= qall", "='Dimension Calculation'!D20"),
-        ("Kontrol Eksentrisitas Tanah (Tanpa Tarik)", "e <= L/6", "='Dimension Calculation'!D18"),
-        ("Kapasitas Geser Balok Satu Arah", "Vu1 <= φVc1", "='Structural Calculation'!D17"),
-        ("Kapasitas Geser Pons Dua Arah", "Vu2 <= φVc2", "='Structural Calculation'!D23"),
-        ("Batas Jarak Spasi Tulangan Lentur", "s <= smax", "='Reinforcement Calculation'!D14")
+        ("Kapasitas Daya Dukung Tanah (Geoteknik)", "qmax <= qall", eval_bearing),
+        ("Kontrol Eksentrisitas Tanah (Tanpa Tarik)", "e <= L/6", cek_e),
+        ("Kapasitas Geser Balok Satu Arah", "Vu1 <= φVc1", Cek_Vu1),
+        ("Kapasitas Geser Pons Dua Arah", "Vu2 <= φVc2", Cek_Vu2),
+        ("Batas Jarak Spasi Tulangan Lentur", "s <= smax", cek_s_x)
     ]
 
     for item in checks_matrix:
@@ -1034,7 +1160,7 @@ def generate_foundation_calculation_report(
 
     ws6.column_dimensions["A"].width = 40
     ws6.column_dimensions["B"].width = 25
-    ws6.column_dimensions["C"].width = 38
+    ws6.column_dimensions["C"].width = 40
 
     out = io.BytesIO()
     wb.save(out)
@@ -1043,11 +1169,12 @@ def generate_foundation_calculation_report(
 
 
 # =============================================================================
-# WRAPPER COMPATIBILITY FUNCTIONS
+# WRAPPER FUNCTIONS (DENGAN CACHING UNTUK MENCEGAH GRAFIK LAMA MUNCUL)
 # =============================================================================
 
+@cache_decorator
 def generate_excel_report(project_info, soil_params, load_params, comp_results, selected_dim, reinf_results=None):
-    """Fungsi utama ekspor excel pondasi dengan 6 sheet aktif rumus."""
+    """Fungsi utama ekspor excel pondasi 6 sheet terhitung runtut."""
     return generate_foundation_calculation_report(
         project_info=project_info,
         soil_params=soil_params,
@@ -1058,30 +1185,32 @@ def generate_excel_report(project_info, soil_params, load_params, comp_results, 
     )
 
 
+@cache_decorator
 def generate_spt_excel(spt_layers, project_info):
-    """Fungsi ekspor data SPT ke format 5 sheet profesional."""
-    return generate_soil_investigation_report(project_info=project_info, spt_layers=spt_layers, cpt_points=None)
+    """Ekspor laporan penyelidikan tanah resmi SPT 5 sheets (Cached)."""
+    return generate_soil_investigation_report(project_info, spt_layers=spt_layers, cpt_points=None)
 
 
+@cache_decorator
 def generate_cpt_excel(cpt_points, project_info):
-    """Fungsi ekspor data CPT ke format 5 sheet profesional."""
-    return generate_soil_investigation_report(project_info=project_info, spt_layers=None, cpt_points=cpt_points)
+    """Ekspor laporan penyelidikan tanah resmi CPT 5 sheets (Cached)."""
+    return generate_soil_investigation_report(project_info, spt_layers=None, cpt_points=cpt_points)
 
 
 def generate_csv_report(comp_results, selected_dim):
-    """Ekspor CSV ringkas untuk kompatibilitas data spreadsheet biasa."""
+    """Ekspor tabel ringkasan komparasi 4 metode fondasi dalam format CSV."""
     rows = []
     for r in comp_results:
         rows.append({
-            "Metode": r.get("metode", "-"),
-            "Dimensi": f"{selected_dim.get('B', 2.0):.2f} x {selected_dim.get('L', 2.0):.2f} m",
-            "Kedalaman Df (m)": selected_dim.get("Df", 1.5),
-            "Nc": r.get("Nc", 0.0),
-            "Nq": r.get("Nq", 0.0),
-            "Ngamma": r.get("Ngamma", 0.0),
-            "qu (kPa)": r.get("qu", 0.0),
-            "qall (kPa)": r.get("qall", 0.0),
-            "Status": r.get("status", "-")
+            "Metode": r.get("Metode", "-"),
+            "B (m)": selected_dim.get("B", 2.0),
+            "L (m)": selected_dim.get("L", 2.0),
+            "Df (m)": selected_dim.get("Df", 1.5),
+            "qu (kPa)": r.get("qu (kPa)", 0.0),
+            "qall (kPa)": r.get("qall (kPa)", 0.0),
+            "q_kontak (kPa)": r.get("q_kontak (kPa)", 0.0),
+            "Safety Factor": r.get("Faktor Keamanan (SF)", 3.0),
+            "Status": r.get("Status Keamanan", "AMAN")
         })
     df = pd.DataFrame(rows)
-    return df.to_csv(index=False)
+    return df.to_csv(index=False).encode('utf-8')

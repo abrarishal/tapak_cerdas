@@ -257,17 +257,39 @@ def design_footing_reinforcement(
     vol_concrete_m3 = (B_m * L_m * hf_m)  # m3
 
     # Panjang tulangan per batang (dengan tambahan kait 90 derajat jika diperlukan atau standar)
-    hook_len_mm = 12.0 * db if hook_needed else 0.0
+    hook_len_mm = 12.0 * db if hook_needed else 150.0
     len_bar_x_m = ((B - 2.0 * cc + 2.0 * hook_len_mm) / 1000.0)
     len_bar_y_m = ((L - 2.0 * cc + 2.0 * hook_len_mm) / 1000.0)
 
     total_len_x_m = reinf_x["n_bars"] * len_bar_x_m
     total_len_y_m = reinf_y["n_bars"] * len_bar_y_m
-    total_rebar_len_m = total_len_x_m + total_len_y_m
+    bot_rebar_len_m = total_len_x_m + total_len_y_m
 
-    # Berat jenis baja tulangan (SNI / nominal): w = 0.006165 * db^2 (kg/m)
+    # Tulangan Atas (Top Mesh Keranjang Kotak Footplate - SNI 2847)
+    db_top = max(10.0, db - 3.0)  # Misal D13 untuk bawah D16, atau D10 untuk bawah D13
+    n_top_x = max(3, reinf_x["n_bars"] - 1)
+    n_top_y = max(3, reinf_y["n_bars"] - 1)
+    s_top_x = (B - 2.0 * cc - db_top) / max(1, n_top_x - 1)
+    s_top_y = (L - 2.0 * cc - db_top) / max(1, n_top_y - 1)
+    callout_top_x = f"D{int(db_top)}-{int(s_top_x)} mm ({n_top_x} batang)"
+    callout_top_y = f"D{int(db_top)}-{int(s_top_y)} mm ({n_top_y} batang)"
+
+    top_len_x_m = n_top_x * len_bar_x_m
+    top_len_y_m = n_top_y * len_bar_y_m
+    top_rebar_len_m = top_len_x_m + top_len_y_m
+
+    # Stek Kolom (4 batang sudut kolom panjang 1.5 m)
+    dowel_len_m = 4 * 1.50
+
+    # Berat jenis baja tulangan (SNI): w = 0.006165 * db^2 (kg/m)
     unit_weight_rebar = 0.006165 * (db**2)  # kg/m
-    total_rebar_weight_kg = total_rebar_len_m * unit_weight_rebar
+    unit_weight_top = 0.006165 * (db_top**2)
+    weight_bot_kg = bot_rebar_len_m * unit_weight_rebar
+    weight_top_kg = top_rebar_len_m * unit_weight_top
+    weight_dowel_kg = dowel_len_m * unit_weight_rebar
+
+    total_rebar_weight_kg = weight_bot_kg + weight_top_kg + weight_dowel_kg
+    total_rebar_len_m = bot_rebar_len_m + top_rebar_len_m + dowel_len_m
 
     # Rasio penulangan per volume beton (kg besi / m3 beton)
     steel_ratio_kg_m3 = total_rebar_weight_kg / vol_concrete_m3 if vol_concrete_m3 > 0 else 0.0
@@ -284,6 +306,7 @@ def design_footing_reinforcement(
     # Ringkasan Rekomendasi Notasi Desain
     callout_x = f"D{int(db)}-{int(reinf_x['spacing_mm'])} mm ({reinf_x['n_bars']} batang)"
     callout_y = f"D{int(db)}-{int(reinf_y['spacing_mm'])} mm ({reinf_y['n_bars']} batang)"
+    callout_top_summary = f"D{int(db_top)}-{int(s_top_x)} mm (Keranjang Kotak Footplate)"
 
     return {
         "standard": standard,
@@ -293,6 +316,7 @@ def design_footing_reinforcement(
             "Pu_kN": Pu_kN, "Mux_kNm": Mux_kNm, "Muy_kNm": Muy_kNm,
             "fc_MPa": fc_MPa, "fy_MPa": fy_MPa,
             "cover_mm": cover_mm, "bar_dia_mm": bar_dia_mm,
+            "bar_dia_top_mm": db_top,
             "dx_mm": dx, "dy_mm": dy, "d_avg_mm": d_avg
         },
         "soil_pressures": {
@@ -354,6 +378,12 @@ def design_footing_reinforcement(
             },
             "gamma_s_center_band": gamma_s
         },
+        "top_rebar": {
+            "bar_dia_mm": db_top,
+            "dir_x": {"n_bars": n_top_x, "spacing_mm": s_top_x, "callout": callout_top_x},
+            "dir_y": {"n_bars": n_top_y, "spacing_mm": s_top_y, "callout": callout_top_y},
+            "callout": callout_top_summary
+        },
         "development_length": {
             "ld_mm": ld,
             "ldh_hook_mm": ldh,
@@ -366,12 +396,15 @@ def design_footing_reinforcement(
             "vol_concrete_m3": round(vol_concrete_m3, 3),
             "total_rebar_len_m": round(total_rebar_len_m, 2),
             "unit_weight_kg_m": round(unit_weight_rebar, 3),
+            "weight_bot_kg": round(weight_bot_kg, 1),
+            "weight_top_kg": round(weight_top_kg, 1),
             "total_rebar_weight_kg": round(total_rebar_weight_kg, 1),
             "steel_ratio_kg_m3": round(steel_ratio_kg_m3, 1)
         },
         "summary": {
             "rebar_x": callout_x,
             "rebar_y": callout_y,
+            "rebar_top": callout_top_summary,
             "concrete_cover": f"{int(cover_mm)} mm",
             "footing_thickness": f"{hf_m:.2f} m ({int(hf)} mm)",
             "is_all_safe": all_structural_safe,

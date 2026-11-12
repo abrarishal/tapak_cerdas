@@ -279,7 +279,8 @@ with tab_spt:
                 data=spt_xlsx,
                 file_name=f"Soil_Investigation_Report_{st.session_state.project_info['name'].replace(' ', '_')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
+                use_container_width=True,
+                key="btn_dl_spt_xlsx_report"
             )
     with col_btn4:
         if len(st.session_state.spt_layers) > 0:
@@ -290,7 +291,8 @@ with tab_spt:
                 data=csv_spt,
                 file_name="Bore_Log_SPT.csv",
                 mime="text/csv",
-                use_container_width=True
+                use_container_width=True,
+                key="btn_dl_spt_csv_report"
             )
 
     st.markdown("---")
@@ -501,7 +503,8 @@ with tab_cpt:
                     data=cpt_xlsx,
                     file_name=f"Soil_Investigation_Report_{st.session_state.project_info['name'].replace(' ', '_')}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
+                    use_container_width=True,
+                    key="btn_dl_cpt_xlsx_report"
                 )
             with col_cpt_b4:
                 df_cpt = pd.DataFrame(processed_cpt)
@@ -511,7 +514,8 @@ with tab_cpt:
                     data=csv_cpt,
                     file_name="Hasil_Uji_Sondir_CPT.csv",
                     mime="text/csv",
-                    use_container_width=True
+                    use_container_width=True,
+                    key="btn_dl_cpt_csv_report"
                 )
 
         # Rata-rata Zona Dangkal (0 - 3m)

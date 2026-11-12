@@ -26,6 +26,7 @@ from database.db_manager import (
     SUBMISSIONS_EXCEL
 )
 from utils.excel_exporter import generate_excel_report, generate_csv_report
+from modules.dxf_exporter import generate_foundation_dxf
 from modules.bearing_capacity import calculate_terzaghi, calculate_meyerhof, calculate_vesic, calculate_hansen
 
 # Konfigurasi Halaman
@@ -167,8 +168,12 @@ with tab_history:
         )
         
         csv_txt = generate_csv_report(comp_summary, {"B": 1.5, "L": 1.5, "Df": 1.5})
+        dxf_bytes = generate_foundation_dxf(
+            B_m=1.5, L_m=1.5, hf_m=0.40, Df_m=1.5,
+            project_info=st.session_state.project_info
+        )
 
-        col_dl1, col_dl2 = st.columns(2)
+        col_dl1, col_dl2, col_dl3 = st.columns([1.5, 1.5, 1.0])
         with col_dl1:
             st.download_button(
                 "📊 Unduh Laporan Lengkap Excel (.xlsx)",
@@ -176,15 +181,26 @@ with tab_history:
                 file_name=f"Laporan_Geoteknik_{st.session_state.project_info.get('name', 'Pondasi').replace(' ', '_')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 type="primary",
-                use_container_width=True
+                use_container_width=True,
+                key="btn_dl_riwayat_excel"
             )
         with col_dl2:
+            st.download_button(
+                "📐 Unduh Gambar AutoCAD (.dxf)",
+                data=dxf_bytes,
+                file_name=f"Gambar_Kerja_{st.session_state.project_info.get('name', 'Pondasi').replace(' ', '_')}.dxf",
+                mime="application/dxf",
+                use_container_width=True,
+                key="btn_dl_riwayat_cad_dxf"
+            )
+        with col_dl3:
             st.download_button(
                 "📄 Unduh Ringkasan CSV (.csv)",
                 data=csv_txt,
                 file_name="Rekapitulasi_Komparasi_4_Metode.csv",
                 mime="text/csv",
-                use_container_width=True
+                use_container_width=True,
+                key="btn_dl_riwayat_csv"
             )
 
     st.markdown("---")
@@ -288,7 +304,8 @@ with tab_inbox:
                         data=f_sub_ex.read(),
                         file_name="Rekap_Data_Pengguna_Masuk.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        type="primary"
+                        type="primary",
+                        key="btn_dl_master_submissions"
                     )
 
             st.markdown("#### 📋 Tabel Pengajuan Desain dari Pengguna:")

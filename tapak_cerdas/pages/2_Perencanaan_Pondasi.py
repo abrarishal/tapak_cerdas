@@ -36,6 +36,7 @@ from modules.visualizer import (
     plot_safety_gauge
 )
 from modules.deep_foundation import compare_foundation_shapes
+from modules.dxf_exporter import generate_foundation_dxf
 from utils.excel_exporter import generate_excel_report, generate_csv_report
 from database.db_manager import save_client_submission
 
@@ -776,10 +777,10 @@ with col_right:
     st.markdown("<br>", unsafe_allow_html=True)
 
     # =========================================================================
-    # TOMBOL EKSPOR EXCEL & CSV
+    # TOMBOL EKSPOR EXCEL, AUTOCAD (DXF), & CSV
     # =========================================================================
-    st.markdown("#### 📥 Ekspor Laporan Resmi Excel (.xlsx) & CSV:")
-    exp_col1, exp_col2 = st.columns(2)
+    st.markdown("#### 📥 Ekspor Laporan Resmi Excel (.xlsx), Gambar AutoCAD (.dxf), & CSV:")
+    exp_col1, exp_col2, exp_col3 = st.columns([1.5, 1.5, 1.0])
     
     excel_bytes = generate_excel_report(
         project_info=st.session_state.project_info,
@@ -800,6 +801,19 @@ with col_right:
         selected_dim={"B": lebar_b, "L": panjang_l, "Df": df_in, "hf": hf, "SF": sf_in, "shape": bentuk_fondasi},
         reinf_results=reinf_results
     )
+
+    dxf_bytes = generate_foundation_dxf(
+        B_m=lebar_b,
+        L_m=panjang_l,
+        hf_m=hf,
+        Df_m=df_in,
+        col_b_m=col_b_val,
+        col_h_m=col_h_val,
+        cover_mm=cover_val,
+        bar_dia_mm=bar_dia_val,
+        reinf_results=reinf_results,
+        project_info=st.session_state.project_info
+    )
     
     csv_str = generate_csv_report(
         comp_results=table_comp,
@@ -808,21 +822,33 @@ with col_right:
     
     with exp_col1:
         st.download_button(
-            label="📊 Unduh Laporan Perhitungan Struktur 6-Sheets (.xlsx)",
+            label="📊 Unduh Laporan Struktur 6-Sheets (.xlsx)",
             data=excel_bytes,
             file_name=f"Laporan_Perhitungan_Fondasi_{st.session_state.project_info['name'].replace(' ', '_')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             type="primary",
-            use_container_width=True
+            use_container_width=True,
+            key="btn_dl_found_excel_6sheets"
         )
-        
+
     with exp_col2:
         st.download_button(
-            label="📄 Unduh Data CSV (.csv)",
+            label="📐 Unduh Gambar AutoCAD (.dxf)",
+            data=dxf_bytes,
+            file_name=f"Gambar_Kerja_Fondasi_{st.session_state.project_info['name'].replace(' ', '_')}.dxf",
+            mime="application/dxf",
+            use_container_width=True,
+            key="btn_dl_found_cad_dxf"
+        )
+        
+    with exp_col3:
+        st.download_button(
+            label="📄 Unduh CSV (.csv)",
             data=csv_str,
             file_name="Komparasi_4_Metode_Pondasi.csv",
             mime="text/csv",
-            use_container_width=True
+            use_container_width=True,
+            key="btn_dl_found_csv"
         )
 
     st.markdown("<br>", unsafe_allow_html=True)

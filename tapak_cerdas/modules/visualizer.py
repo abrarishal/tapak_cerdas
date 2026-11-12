@@ -952,13 +952,85 @@ def plot_cutaway_foundation_3d(
                 x=ry_x, y=ry_y, z=ry_z,
                 mode="lines",
                 line=dict(color="#F59E0B", width=5.5),
-                name=f"Tulangan Utama Arah Y (D{int(bar_dia_mm)})",
+                name=f"Tulangan Bawah Arah Y (D{int(bar_dia_mm)})",
                 showlegend=(idx_x == 0),
                 hoverinfo="text",
                 hovertext=f"Tulangan Bawah Arah Y: D{int(bar_dia_mm)} @ elevasi {z_rebar_y:.3f}m"
             ))
 
-        # C. TULANGAN DOWEL KOLOM / STARTER BARS (Vertical Column Dowels)
+        # C. TULANGAN ATAS ARAH X (Top Rebar Mesh X - Kait 90 Derajat Membengkok ke Bawah)
+        z_top_rebar_x = z_top - cover_m - db_m / 2.0
+        for idx_yt, y_pos in enumerate(y_positions):
+            rtx_x = [x_start, x_start, x_end, x_end]
+            rtx_y = [y_pos, y_pos, y_pos, y_pos]
+            rtx_z = [z_top_rebar_x - hook_h, z_top_rebar_x, z_top_rebar_x, z_top_rebar_x - hook_h]
+
+            fig.add_trace(go.Scatter3d(
+                x=rtx_x, y=rtx_y, z=rtx_z,
+                mode="lines",
+                line=dict(color="#60A5FA", width=4.5),
+                name=f"Tulangan Atas Arah X (D{int(max(10, bar_dia_mm-3))})",
+                showlegend=(idx_yt == 0),
+                hoverinfo="text",
+                hovertext=f"Tulangan Atas Arah X: D{int(max(10, bar_dia_mm-3))} @ elevasi {z_top_rebar_x:.3f}m (Kait ke Bawah)"
+            ))
+
+        # D. TULANGAN ATAS ARAH Y (Top Rebar Mesh Y - Kait 90 Derajat Membengkok ke Bawah)
+        z_top_rebar_y = z_top - cover_m - db_m - db_m / 2.0
+        for idx_xt, x_pos in enumerate(x_positions):
+            rty_x = [x_pos, x_pos, x_pos, x_pos]
+            rty_y = [y_start, y_start, y_end, y_end]
+            rty_z = [z_top_rebar_y - hook_h, z_top_rebar_y, z_top_rebar_y, z_top_rebar_y - hook_h]
+
+            fig.add_trace(go.Scatter3d(
+                x=rty_x, y=rty_y, z=rty_z,
+                mode="lines",
+                line=dict(color="#FCD34D", width=4.5),
+                name=f"Tulangan Atas Arah Y (D{int(max(10, bar_dia_mm-3))})",
+                showlegend=(idx_xt == 0),
+                hoverinfo="text",
+                hovertext=f"Tulangan Atas Arah Y: D{int(max(10, bar_dia_mm-3))} @ elevasi {z_top_rebar_y:.3f}m (Kait ke Bawah)"
+            ))
+
+        # E. BEGEL / SENGKANG PENGHUBUNG KERANJANG KOTAK PEMBESIAN (3D Rebar Box Cage)
+        # Sabuk keliling tepi atas penutup keranjang kotak:
+        fig.add_trace(go.Scatter3d(
+            x=[x_start, x_end, x_end, x_start, x_start],
+            y=[y_start, y_start, y_end, y_end, y_start],
+            z=[z_top_rebar_x, z_top_rebar_x, z_top_rebar_x, z_top_rebar_x, z_top_rebar_x],
+            mode="lines",
+            line=dict(color="#A855F7", width=4.5),
+            name="Sabuk Tepi Keranjang Kotak",
+            showlegend=True,
+            hoverinfo="text",
+            hovertext="Sabuk Begel Tepi Atas Keranjang Kotak"
+        ))
+        # Pin Begel Vertikal di sekeliling 4 sisi membentuk jaring keranjang kotak utuh:
+        vert_tie_xs = []
+        vert_tie_ys = []
+        vert_tie_zs = []
+        for xp in x_positions[::max(1, len(x_positions)//6)]:
+            for yp in [y_start, y_end]:
+                vert_tie_xs.extend([xp, xp, None])
+                vert_tie_ys.extend([yp, yp, None])
+                vert_tie_zs.extend([z_rebar_x, z_top_rebar_x, None])
+        for yp in y_positions[::max(1, len(y_positions)//6)]:
+            for xp in [x_start, x_end]:
+                vert_tie_xs.extend([xp, xp, None])
+                vert_tie_ys.extend([yp, yp, None])
+                vert_tie_zs.extend([z_rebar_y, z_top_rebar_y, None])
+
+        fig.add_trace(go.Scatter3d(
+            x=vert_tie_xs, y=vert_tie_ys, z=vert_tie_zs,
+            mode="lines",
+            line=dict(color="#A855F7", width=4.0),
+            name="Sengkang Tepi Keranjang Kotak",
+            showlegend=True,
+            hoverinfo="text",
+            hovertext="Sengkang Tepi Pengikat Keranjang Kotak Pembesian"
+        ))
+
+        # F. TULANGAN DOWEL KOLOM / STARTER BARS (Vertical Column Dowels)
         # 4 batang tulangan sudut kolom mencuat ke atas
         dowel_cover = 0.040  # 40 mm selimut kolom
         dc_x = half_cb - dowel_cover
